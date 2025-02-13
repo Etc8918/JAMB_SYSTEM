@@ -1,5 +1,3 @@
-// /routes/inventarioRoutes.js
-
 const express = require('express');
 const router = express.Router();
 const InventarioController = require('../controllers/InventarioController');
@@ -17,6 +15,9 @@ router.put('/inventarios/:id', InventarioController.updateInventario);
 router.delete('/inventarios/:id', InventarioController.deleteInventario);
 
 // Ruta para obtener un inventario por ID
-router.get('/inventarios/:id', InventarioController.getInventarioById); 
+router.get('/inventarios/:id', InventarioController.getInventarioById);
+
+// Ruta para actualizar la cantidad de un color específico de un inventario
+router.put('/inventarios/:id/color/:color', InventarioController.updateInventarioColor);
 
 module.exports = router;
