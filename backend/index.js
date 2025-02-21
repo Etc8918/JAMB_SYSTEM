@@ -19,12 +19,12 @@ app.use(express.static(path.join(__dirname, '../frontend')));  // Sirve todo lo 
 // Middleware para manejar JSON en las solicitudes
 app.use(express.json());
 
+// Usar las rutas con el prefijo /api
+app.use('/api', proveedorRoutes);
+app.use('/api', clienteRoutes);
+app.use('/api', inventarioRoutes);
+app.use('/api', compraRoutes);
 
-// Usar las rutas de proveedores antes de las de clientes
-app.use(proveedorRoutes); // Usar las rutas de proveedores
-app.use(clienteRoutes); //Usar las rutas de clientes
-app.use(inventarioRoutes);
-app.use(compraRoutes)
 // Ruta básica de prueba
 app.get('/', (req, res) => {
   res.send('¡Hola, mundo! El servidor está funcionando.');

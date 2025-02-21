@@ -18,7 +18,11 @@ router.post('/compras', CompraController.createCompra);
 
 // Ruta para crear un nuevo detalle de compra
 router.post('/detalles_compra', CompraController.createDetalleCompra);
+
 // Ruta para crear un nuevo inventario
 router.post('/inventarios', CompraController.createInventario);
+
+router.get('/capacidades_colores', CompraController.getCapacidadesColores);
+
 
 module.exports = router;

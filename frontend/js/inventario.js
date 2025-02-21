@@ -1,19 +1,70 @@
 document.addEventListener('DOMContentLoaded', function () {
     loadInventories();
 });
+//----------------------------------------
+document.getElementById('searchModel').addEventListener('input', function() {
+    const searchQuery = this.value.trim();
+    loadInventories(searchQuery);
+});
+
+document.getElementById('inventoryForm').addEventListener('submit', function(event) {
+    event.preventDefault();
+    const newInventoryData = {
+        tipo: document.getElementById('inventoryType').value,
+        marca: document.getElementById('inventoryBrand').value,
+        modelo: document.getElementById('inventoryModel').value,
+        capacidad: document.getElementById('inventoryCapacity').value,
+        color: document.getElementById('inventoryColor').value,
+        stock: parseInt(document.getElementById('inventoryStock').value)
+    };
+
+    fetch('http://localhost:3000/api/inventarios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newInventoryData)
+    })
+    .then(response => response.json())
+    .then(() => {
+        loadInventories();
+        const inventoryModalElement = document.getElementById('inventoryModal');
+        const inventoryModalInstance = bootstrap.Modal.getInstance(inventoryModalElement);
+        inventoryModalInstance.hide();
+        // Asegurarse de que el modal se oculta
+        inventoryModalElement.classList.remove('show');
+        inventoryModalElement.style.display = 'none';
+        document.body.classList.remove('modal-open');
+        document.querySelector('.modal-backdrop').remove();
+    })
+    .catch(error => {
+        console.error('Error al agregar el inventario:', error);
+        alert('Hubo un problema al agregar el inventario. Por favor, inténtelo de nuevo.');
+    });
+});
+
+
+//-------------------------------------------
+let searchModelInput = document.getElementById('searchModel'); // Define searchModelInput
+
+// Almacenar modelos y capacidades que deben mantenerse abiertos
+let openDetails = {};
 
 function loadInventories(searchQuery = '') {
-    let url = 'http://localhost:3000/inventarios';
+    let url = 'http://localhost:3000/api/inventarios';
 
     if (searchQuery) {
         url += `?modelo=${searchQuery}`;
     }
 
     fetch(url)
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(inventories => {
             inventoriesTable.innerHTML = '';
-            inventoryTotalStockMap = {}; // Resetear el mapeo
+            inventoryTotalStockMap = {};
 
             if (inventories.length > 0) {
                 inventories.sort((a, b) => a.marca.localeCompare(b.marca));
@@ -34,9 +85,9 @@ function loadInventories(searchQuery = '') {
                     `;
 
                     const detailRow = inventoriesTable.insertRow();
-                    detailRow.style.display = 'none';
+                    detailRow.style.display = openDetails[`${group.modelo}-${group.capacidad}`] ? '' : 'none';
                     detailRow.setAttribute('data-model', group.modelo);
-                    detailRow.setAttribute('data-capacity', group.capacidad); // Asignar el atributo data-capacity
+                    detailRow.setAttribute('data-capacity', group.capacidad);
                     detailRow.innerHTML = `<td colspan="6">
                         ${group.inventories.map(item => `
                             <div>
@@ -56,15 +107,19 @@ function loadInventories(searchQuery = '') {
                         </div>
                     </td>`;
 
-                    // Guardar el total del stock en el mapeo
                     inventoryTotalStockMap[`${group.modelo}-${group.capacidad}`] = group.totalStock;
                 });
             } else {
                 inventoriesTable.innerHTML = "<tr><td colspan='6' class='text-center'>No se encontraron inventarios</td></tr>";
             }
         })
-        .catch(error => console.error('Error al cargar los inventarios:', error));
+        .catch(error => {
+            console.error('Error al cargar los inventarios:', error);
+            alert('Hubo un problema al cargar los inventarios. Por favor, inténtelo de nuevo.');
+        });
 }
+
+
 
 function groupInventories(inventories) {
     const groups = {};
@@ -87,9 +142,12 @@ function groupInventories(inventories) {
 }
 
 window.toggleDetails = function(model, capacity) {
+    const key = `${model}-${capacity}`;
     const detailRows = inventoriesTable.querySelectorAll(`tr[data-model="${model}"][data-capacity="${capacity}"]`);
     detailRows.forEach(row => {
-        row.style.display = row.style.display === 'none' ? '' : 'none';
+        const isVisible = row.style.display === '';
+        row.style.display = isVisible ? 'none' : '';
+        openDetails[key] = !isVisible;
     });
 };
 
@@ -131,7 +189,7 @@ window.saveChanges = function(model, capacity) {
     }
 
     updatedInventories.forEach(inventory => {
-        fetch(`http://localhost:3000/inventarios/${inventory.id}/color/${inventory.color}`, {
+        fetch(`http://localhost:3000/api/inventarios/${inventory.id}/color/${inventory.color}`, { // Asegúrate de usar el prefijo /api
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ stock: inventory.stock })
@@ -183,15 +241,14 @@ window.saveNewColor = function(model, capacity, uniqueId) {
         stock: 0
     };
 
-    fetch('http://localhost:3000/inventarios', {
+    fetch('http://localhost:3000/api/inventarios', { // Asegúrate de usar el prefijo /api
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newInventoryData)
     })
     .then(response => response.json())
     .then(() => {
-        loadInventories(searchModelInput.value);
-        toggleDetails(model, capacity); // Mantener el despliegue abierto
+        loadInventories(searchModelInput.value); // No cerrar los detalles
     });
 };
 
@@ -199,5 +256,15 @@ window.cancelDetails = function(model, capacity) {
     const detailRows = inventoriesTable.querySelectorAll(`tr[data-model="${model}"][data-capacity="${capacity}"]`);
     detailRows.forEach(row => {
         row.style.display = 'none';
+        delete openDetails[`${model}-${capacity}`];
     });
 };
+
+document.getElementById('addInventoryBtn').addEventListener('click', function() {
+    const inventoryModal = new bootstrap.Modal(document.getElementById('inventoryModal'), {
+        keyboard: false
+    });
+    document.getElementById('inventoryModalLabel').textContent = 'Agregar Inventario';
+    document.getElementById('inventoryForm').reset();
+    inventoryModal.show();
+});
