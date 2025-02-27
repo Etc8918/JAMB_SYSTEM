@@ -24,5 +24,11 @@ router.post('/inventarios', CompraController.createInventario);
 
 router.get('/capacidades_colores', CompraController.getCapacidadesColores);
 
+// Ruta para obtener todas las compras con sus detalles y proveedor
+router.get('/compras_con_detalles', CompraController.getComprasConDetalles)
+
+// Ruta para obtener compras y detalles por proveedor
+router.get('/compras_por_proveedor/:proveedorId', CompraController.getComprasPorProveedor);
+
 
 module.exports = router;

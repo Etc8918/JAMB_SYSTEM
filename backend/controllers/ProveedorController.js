@@ -1,4 +1,33 @@
+// controllers/ProveedorController.js
+
 const connection = require('../config/db');
+
+// Obtener proveedores con saldo pendiente total
+exports.getProveedoresConSaldoPendiente = (req, res) => {
+  const query = `
+    SELECT 
+      p.id_proveedor,
+      p.nombre AS proveedor_nombre,
+      v.saldo_pendiente_total
+    FROM 
+      vw_saldos_por_proveedor v
+    JOIN 
+      proveedores p ON v.id_proveedor = p.id_proveedor
+    ORDER BY 
+      p.nombre ASC;
+  `;
+
+  connection.query(query, (err, results) => {
+    if (err) {
+      console.error('Error al obtener los proveedores con saldo pendiente:', err);
+      res.status(500).json({ message: 'Error al obtener los proveedores con saldo pendiente' });
+      return;
+    }
+
+    res.json(results);
+  });
+};
+
 
 // Obtener todos los proveedores
 exports.getProveedores = (req, res) => {

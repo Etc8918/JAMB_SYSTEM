@@ -51,19 +51,27 @@ exports.createInventario = (req, res) => {
 // Actualizar inventario
 exports.updateInventario = (req, res) => {
     const { id } = req.params;
-    const { tipo, marca, modelo, capacidad, color, stock } = req.body;
-    const query = "UPDATE inventario SET tipo = ?, marca = ?, modelo = ?, capacidad = ?, color = ?, stock = ? WHERE id_inventario = ?";
-    connection.query(query, [tipo, marca, modelo, capacidad, color, stock, id], (err, result) => {
-        if (err) {
-            console.error(err);
-            return res.status(500).json({ message: "Error al actualizar el inventario" });
-        }
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ message: "Inventario no encontrado" });
-        }
-        res.json({ message: "Inventario actualizado exitosamente" });
+    const { stock } = req.body;
+  
+    // Verificar que el stock sea un número válido
+    if (stock === undefined || isNaN(stock)) {
+      return res.status(400).json({ message: "Stock inválido" });
+    }
+  
+    const query = "UPDATE inventario SET stock = ? WHERE id_inventario = ?";
+    connection.query(query, [stock, id], (err, result) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ message: "Error al actualizar el inventario" });
+      }
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: "Inventario no encontrado" });
+      }
+      res.json({ message: "Inventario actualizado exitosamente" });
     });
-};
+  };
+  
+  
 
 // Actualizar cantidad de un color específico de un inventario
 exports.updateInventarioColor = (req, res) => {
