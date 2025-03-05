@@ -1,55 +1,40 @@
-// index.js
+import express from 'express';
+import path from 'path';
+import cors from 'cors';
+import bodyParser from 'body-parser';
+import errorHandler from './middleware/errorHandler.js';
 
-const express = require('express');
-const path = require('path');
-const cors = require('cors');
-const bodyParser = require('body-parser');
+import proveedorRoutes from './routes/proveedorRoutes.js';
+import clienteRoutes from './routes/clienteRoutes.js';
+import inventarioRoutes from './routes/inventarioRoutes.js';
+import compraRoutes from './routes/compraRoutes.js';
+import detallesCompraRoutes from './routes/detallesCompraRoutes.js'; // ✅ Importación corregida
 
-// Importar las rutas
-const proveedorRoutes = require('./routes/proveedorRoutes');
-const clienteRoutes = require('./routes/clienteRoutes');
-const inventarioRoutes = require('./routes/inventarioRoutes');
-const compraRoutes = require('./routes/compraRoutes');
-const detallesCompraRoutes = require('./routes/detallesCompraRoutes');
-
-// Crear una instancia de Express
 const app = express();
 
-// Habilitar CORS para todas las rutas
+// Middleware
 app.use(cors());
-
-// Middleware para manejar JSON en las solicitudes
 app.use(express.json());
-app.use(bodyParser.urlencoded({ extended: true })); // Para parsear solicitudes application/x-www-form-urlencoded
+app.use(bodyParser.urlencoded({ extended: true }));
 
-// Servir los archivos estáticos del frontend
+// Configuración para archivos estáticos en ES6
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 app.use(express.static(path.join(__dirname, '../frontend')));
 
-// Usar las rutas con los prefijos correspondientes
+// Rutas
 app.use('/api/proveedores', proveedorRoutes);
 app.use('/api/clientes', clienteRoutes);
-app.use('/api/inventarios', inventarioRoutes);
+app.use('/api/inventario', inventarioRoutes);
 app.use('/api/compras', compraRoutes);
-app.use('/api/detalles_compra', detallesCompraRoutes);
+app.use('/api/detalles_compra', detallesCompraRoutes); // ✅ Asegurar que se está usando correctamente
+app.use(errorHandler);
 
-// Ruta básica de prueba
-app.get('/', (req, res) => {
-  res.send('¡Hola, mundo! El servidor está funcionando.');
-});
-
-// Manejo de rutas no encontradas (404)
-app.use((req, res, next) => {
-  res.status(404).send('Página no encontrada');
-});
-
-// Manejo de errores del servidor
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).send('Error en el servidor');
-});
-
-// Iniciar el servidor
+// Servidor
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
-  console.log(`Servidor corriendo en http://localhost:${port}`);
+  console.log(`✅ Servidor corriendo en http://localhost:${port}`);
 });

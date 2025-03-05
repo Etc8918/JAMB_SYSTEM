@@ -1,117 +1,99 @@
-// controllers/ProveedorController.js
+import { pool } from '../config/db.js'; // 📌 Importar conexión a la BD
 
-const connection = require('../config/db');
+// 📌 Obtener todos los proveedores o filtrar por nombre
+export const getProveedores = async (req, res) => {
+    try {
+        const { nombre } = req.query;
+        let query = "SELECT id_proveedor, UPPER(nombre) AS nombre, UPPER(contacto) AS contacto, telefono, UPPER(direccion) AS direccion FROM proveedores";
+        let params = [];
 
-// Obtener proveedores con saldo pendiente total
-exports.getProveedoresConSaldoPendiente = (req, res) => {
-  const query = `
-    SELECT 
-      p.id_proveedor,
-      p.nombre AS proveedor_nombre,
-      v.saldo_pendiente_total
-    FROM 
-      vw_saldos_por_proveedor v
-    JOIN 
-      proveedores p ON v.id_proveedor = p.id_proveedor
-    ORDER BY 
-      p.nombre ASC;
-  `;
+        if (nombre) {
+            query += " WHERE nombre LIKE ?";
+            params.push(`%${nombre.toUpperCase()}%`);
+        }
 
-  connection.query(query, (err, results) => {
-    if (err) {
-      console.error('Error al obtener los proveedores con saldo pendiente:', err);
-      res.status(500).json({ message: 'Error al obtener los proveedores con saldo pendiente' });
-      return;
+        query += " ORDER BY nombre ASC";
+        const [rows] = await pool.query(query, params);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ message: "No se encontraron proveedores." });
+        }
+
+        res.json(rows);
+    } catch (error) {
+        console.error("❌ Error al obtener proveedores:", error);
+        res.status(500).json({ message: "Error al obtener proveedores." });
+    }
+};
+
+// 📌 Crear un nuevo proveedor
+export const createProveedor = async (req, res) => {
+    const { nombre, contacto, telefono, direccion } = req.body;
+
+    if (!nombre || !telefono) {
+        return res.status(400).json({ message: "El nombre y el teléfono son obligatorios." });
     }
 
-    res.json(results);
-  });
+    try {
+        const [result] = await pool.query(
+            "INSERT INTO proveedores (nombre, contacto, telefono, direccion) VALUES (?, ?, ?, ?)",
+            [nombre.toUpperCase(), contacto.toUpperCase(), telefono, direccion.toUpperCase()]
+        );
+        res.status(201).json({ message: "Proveedor agregado correctamente", id: result.insertId });
+    } catch (error) {
+        console.error("❌ Error al crear proveedor:", error);
+        res.status(500).json({ message: "Error al crear proveedor." });
+    }
 };
 
-
-// Obtener todos los proveedores
-exports.getProveedores = (req, res) => {
-  let query = "SELECT * FROM proveedores";
-  const params = [];
-
-  if (req.query.nombre) {
-      query += " WHERE nombre LIKE ?";
-      params.push(`%${req.query.nombre}%`);
-  }
-
-  connection.query(query, params, (err, results) => {
-      if (err) {
-          console.error(err);
-          return res.status(500).json({ message: "Error al obtener los proveedores" });
-      }
-      res.json(results);
-  });
-}
-           
-
-// Obtener proveedor por ID
-exports.getProveedorById = (req, res) => {
-  const { id } = req.params;
-  const query = 'SELECT * FROM proveedores WHERE id_proveedor = ?';
-  connection.query(query, [id], (err, result) => {
-      if (err) {
-          console.error(err);
-          return res.status(500).json({ message: 'Error al obtener proveedor' });
-      }
-      if (result.length === 0) {
-          return res.status(404).json({ message: 'Proveedor no encontrado' });
-      }
-      res.json(result[0]);
-  });
-};
-
-// Crear un nuevo proveedor
-exports.createProveedor = (req, res) => {
-    const { nombre, contacto, telefono, direccion } = req.body;
-    const query = "INSERT INTO proveedores (nombre, contacto, telefono, direccion) VALUES (?, ?, ?, ?)";
-    connection.query(query, [nombre, contacto, telefono, direccion], (err, result) => {
-        if (err) {
-            console.error(err);
-            return res.status(500).json({ message: "Error al crear el cliente" });
-          }
-          res.status(201).json({ message: "Proveedor creado exitosamente" });
-
-    });
-           
-        };
- 
-
-// Actualizar proveedor
-exports.updateProveedor = (req, res) => {
+// 📌 Actualizar un proveedor
+export const updateProveedor = async (req, res) => {
     const { id } = req.params;
     const { nombre, contacto, telefono, direccion } = req.body;
-    const query = "UPDATE proveedores SET nombre = ?, contacto = ?, telefono = ?, direccion = ? WHERE id_proveedor = ?";
-    connection.query(query, [nombre, contacto, telefono,direccion,id],(err, result) => {
-        if (err) {
-          console.error(err);
-          return res.status(500).json({ message: "Error al actualizar el proveedor" });
-        }
+
+    if (!nombre || !telefono) {
+        return res.status(400).json({ message: "El nombre y el teléfono son obligatorios." });
+    }
+
+    try {
+        const [result] = await pool.query(
+            "UPDATE proveedores SET nombre = ?, contacto = ?, telefono = ?, direccion = ? WHERE id_proveedor = ?",
+            [nombre.toUpperCase(), contacto.toUpperCase(), telefono, direccion.toUpperCase(), id]
+        );
+
         if (result.affectedRows === 0) {
-          return res.status(404).json({ message: "Proveedor no encontrado" });
+            return res.status(404).json({ message: "Proveedor no encontrado." });
         }
-        res.json({ message: "Proveedor actualizado exitosamente" });
-      });
+
+        res.json({ message: "Proveedor actualizado correctamente" });
+    } catch (error) {
+        console.error("❌ Error al actualizar proveedor:", error);
+        res.status(500).json({ message: "Error al actualizar proveedor." });
+    }
 };
 
-// Eliminar proveedor
-exports.deleteProveedor = (req, res) => {
+// 📌 Eliminar un proveedor con validación de compras asociadas
+export const deleteProveedor = async (req, res) => {
     const { id } = req.params;
-    const query ="DELETE FROM proveedores WHERE id_proveedor = ?";
-    connection.query(query, [id], (err, result) => {
-        if (err) {
-          console.error(err);
-          return res.status(500).json({ message: "Error al eliminar el Proveedor" });
-        }
-        if (result.affectedRows === 0) {
-          return res.status(404).json({ message: "Proveedor no encontrado" });
-        }
-        res.json({ message: "Proveedor eliminado exitosamente" });
-      });
-    
-    };
 
+    try {
+        // Verificar si el proveedor tiene compras asociadas
+        const [compras] = await pool.query("SELECT id_compra FROM compras WHERE id_proveedor = ?", [id]);
+
+        if (compras.length > 0) {
+            return res.status(400).json({ message: "No se puede eliminar el proveedor porque tiene compras registradas." });
+        }
+
+        // Si no tiene compras asociadas, eliminar el proveedor
+        const [result] = await pool.query("DELETE FROM proveedores WHERE id_proveedor = ?", [id]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: "Proveedor no encontrado." });
+        }
+
+        res.json({ message: "Proveedor eliminado correctamente" });
+    } catch (error) {
+        console.error("❌ Error al eliminar proveedor:", error);
+        res.status(500).json({ message: "Error al eliminar proveedor." });
+    }
+};

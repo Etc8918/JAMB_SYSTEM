@@ -1,315 +1,379 @@
-document.addEventListener('DOMContentLoaded', function () {
-  const compraForm = document.getElementById('compraForm');
-  const proveedorCompra = document.getElementById('proveedorCompra');
-  const modeloDetalle = document.getElementById('modeloDetalle');
-  const capacidadDetalle = document.getElementById('capacidadDetalle');
-  const colorDetalle = document.getElementById('colorDetalle');
-  const addProveedorBtn = document.getElementById('addProveedorBtn');
-  const addModeloBtn = document.getElementById('addModeloBtn');
-  const proveedorModal = new bootstrap.Modal(document.getElementById('proveedorModal'));
-  const inventarioModal = new bootstrap.Modal(document.getElementById('inventarioModal'));
-  const proveedorForm = document.getElementById('proveedorForm');
-  const inventarioForm = document.getElementById('inventarioForm');
-  const equiposAgregadosTable = document.getElementById('equiposAgregadosTable').getElementsByTagName('tbody')[0];
-  const agregarDetalleBtn = document.getElementById('agregarDetalleBtn');
+import { apiFetch } from './api.js';
 
-  // Función para cargar proveedores
-  function loadProveedores() {
-    fetch('http://localhost:3000/api/proveedores')
-      .then(response => response.json())
-      .then(data => {
-        const proveedorSelect = document.getElementById('proveedorCompra');
-        proveedorSelect.innerHTML = ''; // Limpiar las opciones anteriores
-        proveedorSelect.add(new Option('Selecciona un proveedor', ''));
-        data.forEach(proveedor => {
-          const option = document.createElement('option');
-          option.value = proveedor.id_proveedor; // Usar el id_proveedor como valor
-          option.textContent = proveedor.nombre;
-          proveedorSelect.appendChild(option);
-        });
-        console.log('Proveedores cargados:', data); // Verificar los proveedores cargados
-      })
-      .catch(error => console.error('Error al cargar los proveedores:', error));
-  }
+document.addEventListener("DOMContentLoaded", async () => {
+    const fechaCompraInput = document.getElementById('fechaCompra');
+    if (fechaCompraInput) {
+        const today = new Date().toISOString().split('T')[0]; // Formato YYYY-MM-DD
+        fechaCompraInput.value = today;
+    }
+    await loadCompras();
+    await loadProveedores();
+    await loadModelos();
 
-  // Función para cargar inventarios
-  function loadInventarios() {
-    fetch('http://localhost:3000/api/inventarios')
-      .then(response => response.json())
-      .then(data => {
-        const modelos = {}; // Objeto para almacenar los modelos únicos
-        data.forEach(inventario => {
-          const key = `${inventario.marca} - ${inventario.modelo}`;
-          if (!modelos[key]) {
-            modelos[key] = { capacidades: [], colores: [], tipo: inventario.tipo, marca: inventario.marca, modelo: inventario.modelo };
-          }
-          modelos[key].capacidades.push(inventario.capacidad);
-          modelos[key].colores.push(inventario.color);
-        });
+    document.getElementById("addProveedorBtn").addEventListener("click", abrirModalProveedor);
+    document.getElementById("addModeloBtn").addEventListener("click", abrirModalInventario);
+    document.getElementById("proveedorForm").addEventListener("submit", guardarProveedor);
+    document.getElementById("inventarioForm").addEventListener("submit", guardarInventario);
+    document.getElementById('agregarDetalleBtn').addEventListener('click', agregarDetalle);
 
-        // Limpiar opciones anteriores
-        modeloDetalle.innerHTML = '';
-        capacidadDetalle.innerHTML = '';
-        colorDetalle.innerHTML = '';
 
-        // Agregar opciones de modelos únicos
-        for (const key in modelos) {
-          const optionModelo = document.createElement('option');
-          optionModelo.value = key;
-          optionModelo.textContent = key;
-          modeloDetalle.appendChild(optionModelo);
-        }
 
-        // Guardar modelos en una variable global para su uso posterior
-        window.modelos = modelos;
-        console.log('Modelos cargados:', window.modelos); // Añadir log para verificar la carga
-      })
-      .catch(error => console.error('Error al cargar los inventarios:', error));
-  }
+    // ✅ Configurar cambio en modelo para cargar capacidades
+    document.getElementById("modeloDetalle").addEventListener("change", async (event) => {
+        await loadCapacidades(event.target.value);
+    });
 
-  // Obtener la fecha actual y establecerla en el campo de fecha
-  document.getElementById('fechaCompra').value = new Date().toISOString().slice(0, 10);
+    // ✅ Configurar cambio en capacidad para cargar colores
+    document.getElementById("capacidadDetalle").addEventListener("change", async (event) => {
+        const id_modelo = document.getElementById("modeloDetalle").value;
+        await loadColores(id_modelo, event.target.value);
+    });
+});
 
-  // Función para obtener los detalles agregados en la tabla
-  function obtenerDetallesAgregados() {
-    const filas = equiposAgregadosTable.getElementsByTagName('tr');
-    const detalles = [];
+// 🛒 Lista de detalles de compra
+let detallesCompra = [];
 
-    for (let i = 0; i < filas.length; i++) {
-      const celdas = filas[i].getElementsByTagName('td');
-      const detalle = {
-        tipo: celdas[0].textContent,
-        marca: celdas[1].textContent,
-        modelo: celdas[2].textContent,
-        capacidad: celdas[3].textContent,
-        color: celdas[4].textContent,
-        cantidad: parseFloat(celdas[5].textContent),
-        costo: parseFloat(celdas[6].textContent)
-      };
-      detalles.push(detalle);
+// ✅ Agregar detalle a la tabla
+function agregarDetalle() {
+    const id_inventario = document.getElementById('modeloDetalle').value;
+    const capacidad = document.getElementById('capacidadDetalle').value;
+    const color = document.getElementById('colorDetalle').value;
+    const cantidad = document.getElementById('cantidadDetalle').value;
+    const costo = document.getElementById('costoDetalle').value;
+
+    // ⚠️ Validación de campos
+    if (!id_inventario || !capacidad || !color || !cantidad || !costo) {
+        Swal.fire("⚠️ Atención", "Todos los campos son obligatorios.", "warning");
+        return;
     }
 
-    return detalles;
-  }
+    // Obtener información adicional de los selects
+    const modeloOption = document.getElementById('modeloDetalle').selectedOptions[0].text;
+    const [marca, modelo] = modeloOption.split(" - "); // ✅ Ahora obtenemos solo Marca y Modelo
 
-  // Función para eliminar una fila de la tabla de equipos agregados
-  window.eliminarFila = function (btn) {
-    const row = btn.parentNode.parentNode;
-    equiposAgregadosTable.deleteRow(row.rowIndex - 1);
-  };
+    // Obtener el tipo desde la base de datos en `loadModelos()`
+    const tipo = obtenerTipoPorId(id_inventario);
 
-  // Función para agregar detalle de compra a la tabla
-  if (agregarDetalleBtn) {
-    agregarDetalleBtn.addEventListener('click', function () {
-      const selectedModel = modeloDetalle.value;
+    // 🔹 Crear objeto detalle
+    const detalle = {
+        id: detallesCompra.length + 1,
+        tipo: tipo, // ✅ Asegurarnos de que es CELULAR, TABLET o ACCESORIOS
+        marca: marca.trim(),
+        modelo: modelo.trim(),
+        capacidad,
+        color,
+        cantidad: parseInt(cantidad, 10),
+        costo: parseFloat(costo).toFixed(2),
+    };
 
-      // Asegurarse de que se ha seleccionado un modelo antes de continuar
-      if (!selectedModel) {
-        console.error('Error: No se ha seleccionado un modelo.');
+    // Agregar detalle a la lista y actualizar la tabla
+    detallesCompra.push(detalle);
+    actualizarTablaDetalles();
+
+    // ✅ Limpiar los combobox y los campos de cantidad y costo después de agregar el detalle
+    document.getElementById('modeloDetalle').value = "";
+    document.getElementById('capacidadDetalle').innerHTML = '<option value="">Seleccione una capacidad</option>';
+    document.getElementById('colorDetalle').innerHTML = '<option value="">Seleccione un color</option>';
+    document.getElementById('cantidadDetalle').value = "";
+    document.getElementById('costoDetalle').value = "";
+}
+
+function obtenerTipoPorId(id_inventario) {
+    const modeloSeleccionado = modelosLista.find(m => m.id_inventario == id_inventario);
+    return modeloSeleccionado ? modeloSeleccionado.tipo : "CELULAR"; // Si no encuentra, asigna CELULAR por defecto
+}
+
+
+// ✅ Actualizar la tabla con los detalles agregados
+function actualizarTablaDetalles() {
+    const tableBody = document.querySelector('#equiposAgregadosTable tbody');
+    tableBody.innerHTML = '';
+
+    if (detallesCompra.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="8" class="text-center">No hay equipos agregados</td></tr>';
         return;
-      }
+    }
 
-      if (window.modelos && window.modelos[selectedModel]) {
-        const tipo = window.modelos[selectedModel].tipo;
-        const marca = window.modelos[selectedModel].marca;
-        const modelo = window.modelos[selectedModel].modelo; // Obtener solo el modelo
-        const capacidad = capacidadDetalle.value;
-        const color = colorDetalle.value;
-        const cantidad = document.getElementById('cantidadDetalle').value;
-        const costo = document.getElementById('costoDetalle').value;
-
-        const row = equiposAgregadosTable.insertRow();
+    detallesCompra.forEach((detalle, index) => {
+        const row = document.createElement('tr');
         row.innerHTML = `
-          <td>${tipo}</td>
-          <td>${marca}</td>
-          <td>${modelo}</td>
-          <td>${capacidad}</td>
-          <td>${color}</td>
-          <td>${cantidad}</td>
-          <td>${costo}</td>
-          <td><button class="btn btn-danger btn-sm" onclick="eliminarFila(this)">Eliminar</button></td>
+            <td>${detalle.tipo}</td>
+            <td>${detalle.marca}</td>
+            <td>${detalle.modelo}</td>
+            <td>${detalle.capacidad}</td>
+            <td>${detalle.color}</td>
+            <td>${detalle.cantidad}</td>
+            <td>$${detalle.costo}</td>
+            <td>
+                <button class="btn btn-sm btn-warning" onclick="editarCantidad(${index})">Editar</button>
+                <button class="btn btn-sm btn-danger" onclick="eliminarDetalle(${index})">Eliminar</button>
+            </td>
         `;
-
-        // Resetea los campos del detalle después de agregar el detalle
-        modeloDetalle.value = '';
-        capacidadDetalle.value = '';
-        colorDetalle.value = '';
-        document.getElementById('cantidadDetalle').value = '';
-        document.getElementById('costoDetalle').value = '';
-      } else {
-        console.error('Error: El modelo seleccionado no existe en la lista de modelos.');
-      }
+        tableBody.appendChild(row);
     });
-  }
+}
 
-  // Manejar el envío del formulario de compra
-  if (compraForm) {
-    compraForm.addEventListener('submit', function (e) {
-      e.preventDefault(); // Evitar el envío del formulario por defecto
-      console.log('Formulario de compra enviado');
+// ✅ Eliminar un detalle agregado
+window.eliminarDetalle = function (index) {
+    detallesCompra.splice(index, 1);
+    actualizarTablaDetalles();
+}
 
-      const detalles = obtenerDetallesAgregados();
-      if (detalles.length === 0) {
-        console.error('No se han agregado equipos. Por favor, agregue al menos un equipo antes de registrar la compra.');
-        return;
-      }
-
-      let costoTotal = 0;
-      detalles.forEach(detalle => {
-        costoTotal += detalle.cantidad * detalle.costo;
-      });
-
-      // Asegúrate de obtener el valor del proveedor seleccionado
-      const proveedorId = proveedorCompra.value;
-      console.log('Proveedor seleccionado:', proveedorId); // Añadir log para verificar el proveedor seleccionado
-      if (!proveedorId) {
-        console.error('Por favor, seleccione un proveedor.');
-        return;
-      }
-
-      const compraData = {
-        proveedor_id: proveedorId,
-        costo_total: costoTotal,
-        saldo_favor: 0,
-        saldo_pendiente: costoTotal,
-        detalles: detalles
-      };
-
-      console.log('Datos enviados al servidor:', compraData); // Verificar los datos
-
-      fetch('http://localhost:3000/api/compras', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(compraData)
-      })
-      .then(response => {
-        console.log('Respuesta del servidor:', response); // Verificar la respuesta del servidor
-        return response.json();
-      })
-      .then(data => {
-        console.log('Datos del servidor:', data); // Verificar datos devueltos
-        if (data.message) {
-          console.log(data.message);
-          compraForm.reset();
-          equiposAgregadosTable.innerHTML = '';
-          document.getElementById('fechaCompra').value = new Date().toISOString().slice(0, 10);
-        } else {
-          console.error('Error en la respuesta del servidor:', data);
+// ✅ Editar la cantidad de un equipo agregado
+window.editarCantidad = function (index) {
+    Swal.fire({
+        title: "Editar Cantidad",
+        input: "number",
+        inputValue: detallesCompra[index].cantidad,
+        showCancelButton: true,
+        confirmButtonText: "Actualizar",
+        preConfirm: (newCantidad) => {
+            if (!newCantidad || newCantidad <= 0) {
+                Swal.showValidationMessage("La cantidad debe ser mayor a 0");
+            }
+            return newCantidad;
         }
-      })
-      .catch(error => console.error('Error al registrar la compra:', error));
+    }).then((result) => {
+        if (result.isConfirmed) {
+            detallesCompra[index].cantidad = parseInt(result.value, 10);
+            actualizarTablaDetalles();
+        }
     });
-  }
+};
 
-  // Mostrar modal para agregar proveedor
-  if (addProveedorBtn) {
-    addProveedorBtn.addEventListener('click', function () {
-      proveedorModal.show();
-    });
-  }
 
-  // Manejar el envío del formulario de proveedor
-  if (proveedorForm) {
-    proveedorForm.addEventListener('submit', function (e) {
-      e.preventDefault();
+// ✅ Cargar compras en la tabla
+async function loadCompras() {
+    try {
+        const compras = await apiFetch("compras");
+        // Si no necesitas renderizar compras, solo realiza la solicitud sin llamar renderComprasTable()
+        console.log("📥 Compras recibidas:", compras); // Para depuración
+    } catch (error) {
+        console.error("❌ Error al cargar compras:", error);
+    }
+}
 
-      const proveedorData = {
-        nombre: document.getElementById('providerName').value,
-        contacto: document.getElementById('providerContact').value,
-        telefono: document.getElementById('providerPhone').value,
-        direccion: document.getElementById('providerDireccion').value
-      };
 
-      fetch('http://localhost:3000/api/proveedores', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(proveedorData)
-      })
-      .then(response => response.json())
-      .then(data => {
-        console.log(data.message);
-        loadProveedores();
-        proveedorModal.hide();
-      })
-      .catch(error => console.error('Error al registrar el proveedor:', error));
-    });
-  }
 
-  // Mostrar modal para agregar inventario
-  if (addModeloBtn) {
-    addModeloBtn.addEventListener('click', function () {
-      inventarioModal.show();
-    });
-  }
+// ✅ Cargar proveedores en el combobox
+async function loadProveedores() {
+    try {
+        const proveedores = await apiFetch("proveedores");
+        const select = document.getElementById("proveedorCompra");
 
-  // Manejar el envío del formulario de inventario
-  if (inventarioForm) {
-    inventarioForm.addEventListener('submit', function (e) {
-      e.preventDefault();
+        select.innerHTML = '<option value="">Seleccione un proveedor</option>';
+        proveedores.forEach(proveedor => {
+            const option = document.createElement("option");
+            option.value = proveedor.id_proveedor;
+            option.textContent = proveedor.nombre.toUpperCase();
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error("❌ Error al cargar proveedores:", error);
+    }
+}
 
-      const inventarioData = {
-        tipo: document.getElementById('inventoryType').value,
-        marca: document.getElementById('inventoryBrand').value,
-        modelo: document.getElementById('inventoryModel').value,
-        capacidad: document.getElementById('inventoryCapacity').value,
-        color: document.getElementById('inventoryColor').value,
-        stock: 0 // Inicialmente 0
-      };
+// ✅ Cargar modelos (Marca + Modelo)
+// ✅ Guardamos los modelos en una lista global para acceder a ellos después
+let modelosLista = [];
 
-      fetch('http://localhost:3000/api/inventarios', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(inventarioData)
-      })
-      .then(response => response.json())
-      .then(data => {
-        console.log(data.message);
-        loadInventarios();
-        inventarioModal.hide();
-      })
-      .catch(error => console.error('Error al registrar el inventario:', error));
-    });
-  }
+async function loadModelos() {
+    try {
+        const modelos = await apiFetch("inventario");
+        const select = document.getElementById("modeloDetalle");
 
-  // Manejar el cambio en el combobox de modeloDetalle
-  if (modeloDetalle) {
-    modeloDetalle.addEventListener('change', function () {
-      const selectedModel = modeloDetalle.value;
-      fetch(`http://localhost:3000/api/capacidades_colores?modelo=${selectedModel.split(' - ')[1]}&marca=${selectedModel.split(' - ')[0]}`)
-        .then(response => response.json())
-        .then(data => {
-          const capacidades = [...new Set(data.map(item => item.capacidad))];
-          const colores = [...new Set(data.map(item => item.color))];
-          const tipo = data.length > 0 ? data[0].tipo : '';
+        select.innerHTML = '<option value="">Seleccione un modelo</option>';
+        modelosLista = modelos; // ✅ Guardamos los modelos en la lista global
 
-          document.getElementById('inventoryType').value = tipo;
-          document.getElementById('inventoryBrand').value = selectedModel.split(' - ')[0];
+        modelos.forEach(modelo => {
+            const option = document.createElement("option");
+            option.value = modelo.id_inventario;
+            option.textContent = `${modelo.marca.toUpperCase()} - ${modelo.modelo.toUpperCase()}`;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error("❌ Error al cargar modelos:", error);
+    }
+}
 
-          // Limpiar opciones anteriores
-          capacidadDetalle.innerHTML = '';
-          colorDetalle.innerHTML = '';
 
-          // Agregar nuevas opciones de capacidad
-          capacidades.forEach(capacidad => {
-            const optionCapacidad = document.createElement('option');
-            optionCapacidad.value = capacidad;
-            optionCapacidad.textContent = capacidad;
-            capacidadDetalle.appendChild(optionCapacidad);
-          });
 
-          // Agregar nuevas opciones de color
-          colores.forEach(color => {
-            const optionColor = document.createElement('option');
-            optionColor.value = color;
-            optionColor.textContent = color;
-            colorDetalle.appendChild(optionColor);
-          });
-        })
-        .catch(error => console.error('Error al cargar capacidades y colores:', error));
-    });
-  }
 
-  // Cargar los datos iniciales
-  loadProveedores();
-  loadInventarios();
-});
+
+
+// ✅ Cargar capacidades basadas en modelo
+async function loadCapacidades(id_modelo) {
+    try {
+        const capacidades = await apiFetch(`inventario/capacidades/${id_modelo}`);
+        const select = document.getElementById("capacidadDetalle");
+
+        select.innerHTML = '<option value="">Seleccione una capacidad</option>';
+        capacidades.forEach(capacidad => {
+            const option = document.createElement("option");
+            option.value = capacidad.capacidad;
+            option.textContent = capacidad.capacidad;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error("❌ Error al cargar capacidades:", error);
+    }
+}
+
+// ✅ Cargar colores basados en modelo y capacidad
+async function loadColores(id_modelo, capacidad) {
+    try {
+        const colores = await apiFetch(`inventario/colores/${id_modelo}/${capacidad}`);
+        const select = document.getElementById("colorDetalle");
+
+        select.innerHTML = '<option value="">Seleccione un color</option>';
+        colores.forEach(color => {
+            const option = document.createElement("option");
+            option.value = color.color;
+            option.textContent = color.color;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error("❌ Error al cargar colores:", error);
+    }
+}
+
+// ✅ Guardar proveedor en la BD
+async function guardarProveedor(event) {
+    event.preventDefault();
+
+    const nombre = document.getElementById("providerName").value.trim().toUpperCase();
+    const contacto = document.getElementById("providerContact").value.trim().toUpperCase();
+    const telefono = document.getElementById("providerPhone").value.trim();
+    const direccion = document.getElementById("providerDireccion").value.trim();
+
+    if (!nombre || !contacto || !telefono) {
+        Swal.fire("⚠️ Atención", "Todos los campos son obligatorios excepto dirección", "warning");
+        return;
+    }
+
+    try {
+        await apiFetch("proveedores", "POST", { nombre, contacto, telefono, direccion });
+
+        Swal.fire("✅ Éxito", "Proveedor registrado correctamente", "success");
+        await loadProveedores();
+        bootstrap.Modal.getInstance(document.getElementById('proveedorModal')).hide();
+        document.getElementById("proveedorForm").reset();
+    } catch (error) {
+        console.error("❌ Error al guardar proveedor:", error);
+        Swal.fire("❌ Error", "No se pudo registrar el proveedor", "error");
+    }
+}
+
+// ✅ Guardar equipo en la BD
+async function guardarInventario(event) {
+    event.preventDefault();
+
+    // Capturar valores de los campos
+    const tipo = document.getElementById("inventoryType").value.trim();
+    const marca = document.getElementById("inventoryBrand").value.trim();
+    const modelo = document.getElementById("inventoryModel").value.trim();
+    const capacidad = document.getElementById("inventoryCapacity").value.trim();
+    const color = document.getElementById("inventoryColor").value.trim();
+
+    // 📌 Iniciar cantidad en 0
+    const cantidad = 0;
+
+    if (!tipo || !marca || !modelo || !capacidad || !color) {
+        Swal.fire("⚠️ Atención", "Todos los campos son obligatorios.", "warning");
+        return;
+    }
+
+    const inventarioData = { tipo, marca, modelo, capacidad, color, cantidad }; // 📌 Se envía cantidad
+
+    try {
+        console.log("📤 Enviando datos a la API:", inventarioData); // 🔍 Depuración
+
+        await apiFetch(`inventario`, 'POST', inventarioData);
+        Swal.fire("✅ Éxito", "Equipo registrado correctamente", "success");
+        await loadModelos();
+        // Limpiar formulario después de guardar
+        document.getElementById("inventarioForm").reset();
+
+        // Cerrar el modal después de guardar
+        bootstrap.Modal.getInstance(document.getElementById('inventarioModal')).hide();
+
+    } catch (error) {
+        console.error("❌ Error al guardar equipo:", error);
+        Swal.fire("❌ Error", error.message || "Error al registrar equipo.", "error");
+    }
+}
+
+
+
+
+// ✅ Funciones para abrir modales
+function abrirModalProveedor() {
+    const modalElement = document.getElementById('proveedorModal');
+    const modal = new bootstrap.Modal(modalElement);
+
+    // Asegurar que `aria-hidden` se elimina al abrir el modal
+    modalElement.removeAttribute("aria-hidden");
+
+    modal.show();
+
+    // Enfocar el primer campo dentro del modal para accesibilidad
+    setTimeout(() => {
+        document.getElementById('providerName')?.focus();
+    }, 300);
+}
+
+
+function abrirModalInventario() {
+    const modal = new bootstrap.Modal(document.getElementById("inventarioModal"));
+    modal.show();
+}
+
+async function registrarCompra(event) {
+    event.preventDefault();
+
+    // Capturar datos del formulario
+    const fecha = document.getElementById('fechaCompra').value;
+    const proveedor_id = document.getElementById('proveedorCompra').value;
+
+    // ⚠️ Validar que haya al menos un detalle agregado
+    if (detallesCompra.length === 0) {
+        Swal.fire("⚠️ Atención", "Debe agregar al menos un detalle a la compra.", "warning");
+        return;
+    }
+
+    // Crear objeto compra
+    const compraData = {
+        fecha,
+        proveedor_id,
+        detalles: detallesCompra // Enviar detalles de compra
+    };
+
+    try {
+        console.log("📤 Enviando compra a la API:", compraData); // 🔍 Depuración
+
+        // ✅ Enviar datos a la API
+        const response = await apiFetch(`compras`, "POST", compraData);
+
+        // ✅ Verificar si la respuesta es correcta
+        if (!response || response.error) {
+            throw new Error(response?.message || "Error al registrar la compra.");
+        }
+
+        // ✅ Mostrar mensaje de éxito
+        Swal.fire("✅ Éxito", "Compra registrada correctamente", "success");
+
+        // ✅ Limpiar la tabla y resetear el formulario
+        detallesCompra = [];
+        actualizarTablaDetalles();
+        const fechaActual = document.getElementById("fechaCompra").value;
+        document.getElementById("compraForm").reset();
+        document.getElementById("fechaCompra").value = fechaActual;
+
+    } catch (error) {
+        console.error("❌ Error al registrar compra:", error);
+        Swal.fire("❌ Error", error.message || "No se pudo registrar la compra.", "error");
+    }
+}
+
+// ✅ Agregar evento al botón de Registrar Compra
+document.getElementById("compraForm").addEventListener("submit", registrarCompra);

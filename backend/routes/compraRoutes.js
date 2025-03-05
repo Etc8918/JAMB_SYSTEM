@@ -1,34 +1,14 @@
-// /routes/compraRoutes.js
+import express from 'express';
+import { getCompras, createCompra, getCompraById, updateCompra, deleteCompra, getCompraDetalles} from '../controllers/CompraController.js';
 
-const express = require('express');
 const router = express.Router();
-const CompraController = require('../controllers/CompraController');
 
-// Ruta para obtener todos los proveedores
-router.get('/proveedores', CompraController.getProveedores);
-
-// Ruta para obtener todos los inventarios
-router.get('/inventarios', CompraController.getInventarios);
-
-// Ruta para obtener capacidades y colores según el modelo
-router.get('/modelos_capacidades', CompraController.getCapacidadesColores);
-
-// Ruta para crear una nueva compra
-router.post('/compras', CompraController.createCompra);
-
-// Ruta para crear un nuevo detalle de compra
-router.post('/detalles_compra', CompraController.createDetalleCompra);
-
-// Ruta para crear un nuevo inventario
-router.post('/inventarios', CompraController.createInventario);
-
-router.get('/capacidades_colores', CompraController.getCapacidadesColores);
-
-// Ruta para obtener todas las compras con sus detalles y proveedor
-router.get('/compras_con_detalles', CompraController.getComprasConDetalles)
-
-// Ruta para obtener compras y detalles por proveedor
-router.get('/compras_por_proveedor/:proveedorId', CompraController.getComprasPorProveedor);
+router.get('/', getCompras); // Obtener todas las compras
+router.get('/:id', getCompraById); // Obtener compra por ID
+router.post('/', createCompra); // Crear nueva compra
+router.put('/:id', updateCompra); // Actualizar compra
+router.delete('/:id', deleteCompra); // Eliminar compra
+router.get("/:id", getCompraDetalles);
 
 
-module.exports = router;
+export default router;

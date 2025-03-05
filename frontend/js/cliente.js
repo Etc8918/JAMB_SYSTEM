@@ -1,119 +1,162 @@
-document.addEventListener('DOMContentLoaded', function () {
-    const clientsTable = document.getElementById('clientsTable').getElementsByTagName('tbody')[0];
-    const clientModal = new bootstrap.Modal(document.getElementById('clientModal'));
-    const clientForm = document.getElementById('clientForm');
-    const searchNameInput = document.getElementById('searchName');
-  
-    let currentClientId = null;
-  
-    // Función para cargar los clientes (con o sin búsqueda)
-    function loadClients(searchQuery = '') {
-        let url = 'http://localhost:3000/clientes'; // Sin '/api', ya que no lo tienes en el backend
-  
-        // Si hay un texto de búsqueda, añadimos el query string a la URL
-        if (searchQuery) {
-            url += `?nombre=${searchQuery}`;
-        }
-  
-        fetch(url)
-            .then(response => response.json())
-            .then(clients => {
-                clientsTable.innerHTML = ''; // Limpiar la tabla antes de agregar nuevos datos
-                if (clients.length > 0) {
-                    clients.forEach(client => {
-                        const row = clientsTable.insertRow();
-                        row.innerHTML = `
-                            <td>${client.id_cliente}</td>
-                            <td>${client.nombre}</td>
-                            <td>${client.telefono}</td>
-                            <td>
-                                <button class="btn btn-warning btn-sm" onclick="editClient(${client.id_cliente})">Editar</button>
-                                <button class="btn btn-danger btn-sm" onclick="deleteClient(${client.id_cliente})">Eliminar</button>
-                            </td>
-                        `;
-                    });
-                } else {
-                    // Si no se encontraron resultados, mostrar un mensaje
-                    clientsTable.innerHTML = "<tr><td colspan='4' class='text-center'>No se encontraron clientes</td></tr>";
-                }
-            })
-            .catch(error => console.error('Error al cargar los clientes:', error));
+import { apiFetch } from './api.js';
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadClientes();
+
+    // Evento para buscar clientes en tiempo real
+    const searchInput = document.getElementById('searchCliente');
+    if (searchInput) {
+        searchInput.addEventListener('input', async (event) => {
+            await loadClientes(event.target.value);
+        });
     }
-  
-    // Función para agregar o editar un cliente
-    clientForm.addEventListener('submit', function (e) {
-        e.preventDefault();
-  
-        const clientData = {
-            nombre: document.getElementById('clientName').value,
-            telefono: document.getElementById('clientPhone').value
-        };
-  
-        if (currentClientId) {
-            // Si hay un cliente seleccionado, actualizar
-            fetch(`http://localhost:3000/clientes/${currentClientId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(clientData)
-            })
-            .then(response => response.json())
-            .then(() => {
-                loadClients();
-                clientModal.hide();
-            });
+
+    // Evento para abrir el modal de agregar cliente
+    const btnAgregar = document.getElementById('btnAgregarCliente');
+    if (btnAgregar) {
+        btnAgregar.addEventListener('click', abrirModalCliente);
+    }
+
+    // Evento para guardar cliente
+    const form = document.getElementById('clienteForm');
+    if (form) {
+        form.addEventListener('submit', async function (event) {
+            event.preventDefault();
+            await guardarCliente();
+        });
+    }
+});
+
+// ✅ Cargar clientes y mostrarlos en la tabla
+async function loadClientes(nombre = '') {
+    try {
+        const queryParam = nombre ? `?nombre=${encodeURIComponent(nombre)}` : '';
+        const clientes = await apiFetch(`clientes${queryParam}`);
+        renderClientesTable(clientes);
+    } catch (error) {
+        console.error("❌ Error al cargar clientes:", error);
+        renderClientesTable([]); // Mostrar tabla vacía en caso de error
+    }
+}
+
+// ✅ Renderizar la tabla de clientes
+function renderClientesTable(clientes) {
+    const table = document.getElementById('clientesTable');
+    if (!table) {
+        console.error("❌ Error: No se encontró la tabla de clientes en el DOM.");
+        return;
+    }
+
+    table.innerHTML = '';
+
+    if (clientes.length === 0) {
+        table.innerHTML = `<tr><td colspan="3" class="text-center">No se encontraron clientes</td></tr>`;
+        return;
+    }
+
+    clientes.forEach(cliente => {
+        const row = table.insertRow();
+        row.innerHTML = `
+            <td>${cliente.nombre.toUpperCase()}</td>
+            <td>${cliente.telefono}</td>
+            <td>
+                <button class="btn btn-warning btn-sm" onclick="editCliente(${cliente.id_cliente}, '${cliente.nombre}', '${cliente.telefono}')">Editar</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteCliente(${cliente.id_cliente})">Eliminar</button>
+            </td>
+        `;
+    });
+}
+
+// ✅ Guardar Cliente (Crear o Actualizar)
+async function guardarCliente() {
+    const id_cliente = document.getElementById("clienteId").value.trim();
+    const nombre = document.getElementById("nombreCliente").value.trim();
+    const telefono = document.getElementById("telefonoCliente").value.trim();
+
+    if (!nombre || !telefono) {
+        Swal.fire("⚠️ Atención", "Todos los campos son obligatorios", "warning");
+        return;
+    }
+
+    try {
+        const metodo = id_cliente ? "PUT" : "POST";
+        const endpoint = id_cliente ? `clientes/${id_cliente}` : "clientes";
+
+        await apiFetch(endpoint, metodo, { nombre, telefono });
+
+        Swal.fire("✅ Éxito", `Cliente ${id_cliente ? "actualizado" : "registrado"} correctamente`, "success");
+
+        // 📌 Cerrar modal después de guardar correctamente
+        const modalElement = document.getElementById('clienteModal');
+        const modal = bootstrap.Modal.getInstance(modalElement);
+        if (modal) modal.hide(); 
+
+        document.getElementById("clienteForm").reset();
+        loadClientes(); // Recargar la tabla
+    } catch (error) {
+        console.error("❌ Error al guardar cliente:", error);
+        Swal.fire("❌ Error", error.message, "error");
+    }
+}
+
+
+// ✅ Editar Cliente
+window.editCliente = function(id, nombre, telefono) {
+    document.getElementById('clienteId').value = id;
+    document.getElementById('nombreCliente').value = nombre;
+    document.getElementById('telefonoCliente').value = telefono;
+    document.getElementById('guardarCliente').innerText = "Actualizar Cliente";
+
+    const modal = new bootstrap.Modal(document.getElementById('clienteModal'));
+    modal.show();
+};
+
+// ✅ Eliminar Cliente con validación de ventas asociadas
+window.deleteCliente = async function(id_cliente) {
+    const confirmDelete = await Swal.fire({
+        title: "¿Estás seguro?",
+        text: "No podrás recuperar este cliente",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Sí, eliminar",
+        cancelButtonText: "Cancelar"
+    });
+
+    if (!confirmDelete.isConfirmed) return;
+
+    try {
+        await apiFetch(`clientes/${id_cliente}`, 'DELETE');
+        Swal.fire("Eliminado", "Cliente eliminado correctamente", "success");
+        loadClientes();
+    } catch (error) {
+        console.error("❌ Error al eliminar cliente:", error);
+        
+        // 📌 Mostrar alerta adecuada si tiene ventas asociadas
+        if (error.message.includes("ventas registradas")) {
+            Swal.fire("❌ No se puede eliminar", "El cliente tiene ventas registradas y no puede ser eliminado.", "error");
         } else {
-            // Si no, crear uno nuevo
-            fetch('http://localhost:3000/clientes', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(clientData)
-            })
-            .then(response => response.json())
-            .then(() => {
-                loadClients();
-                clientModal.hide();
-            });
+            Swal.fire("Error", "No se pudo eliminar el cliente", "error");
         }
-  
-        currentClientId = null;
-        clientForm.reset();
-    });
-  
-    // Función para editar un cliente
-    window.editClient = function(id) {
-        fetch(`http://localhost:3000/clientes/${id}`)
-            .then(response => response.json())
-            .then(client => {
-                document.getElementById('clientName').value = client.nombre;
-                document.getElementById('clientPhone').value = client.telefono;
-                currentClientId = client.id_cliente;
-                clientModal.show();
-            });
-    };
-  
-    // Función para eliminar un cliente
-    window.deleteClient = function(id) {
-        fetch(`http://localhost:3000/clientes/${id}`, {
-            method: 'DELETE'
-        })
-        .then(response => response.json())
-        .then(() => loadClients());
-    };
-  
-    // Cargar los clientes al inicio
-    loadClients();
-  
-    // Manejar la búsqueda en tiempo real
-    searchNameInput.addEventListener('input', function () {
-        const searchQuery = searchNameInput.value; // Obtener lo que el usuario está buscando
-        loadClients(searchQuery); // Recargar los clientes con el filtro de búsqueda
-    });
-  
-    // Mostrar el modal para agregar un cliente
-    document.getElementById('addClientBtn').addEventListener('click', function () {
-        currentClientId = null;
-        clientForm.reset();
-        clientModal.show();
-    });
-  });
-  
+    }
+};
+
+// ✅ **Abrir modal de cliente**
+window.abrirModalCliente = function() {
+    const inputId = document.getElementById('clienteId');
+    const inputNombre = document.getElementById('nombreCliente');
+    const inputTelefono = document.getElementById('telefonoCliente');
+    const btnGuardar = document.getElementById('guardarCliente');
+
+    if (!inputId || !inputNombre || !inputTelefono || !btnGuardar) {
+        console.error("❌ Error: No se encontraron elementos del formulario de clientes.");
+        return;
+    }
+
+    inputId.value = "";
+    inputNombre.value = "";
+    inputTelefono.value = "";
+    btnGuardar.innerText = "Guardar Cliente";
+
+    const modal = new bootstrap.Modal(document.getElementById('clienteModal'));
+    modal.show();
+};

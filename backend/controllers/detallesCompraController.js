@@ -1,9 +1,7 @@
-// controllers/detallesCompraController.js
+import DetallesCompraModel from '../models/detallesCompraModel.js'; // ✅ Importación corregida
 
-const DetallesCompraModel = require('../models/detallesCompraModel');
-
-// Mostrar todos los detalles de compra
-exports.listar = (req, res) => {
+// 📌 Obtener todos los detalles de compra
+export const getDetallesCompra = (req, res) => {
   DetallesCompraModel.getAllDetalles((err, detalles) => {
     if (err) {
       res.status(500).send('Error al obtener los detalles de compra');
@@ -13,8 +11,8 @@ exports.listar = (req, res) => {
   });
 };
 
-// Obtener un detalle de compra específico
-exports.obtenerPorId = (req, res) => {
+// 📌 Obtener un detalle de compra por ID
+export const getDetalleCompraById = (req, res) => {
   const id = req.params.id;
   DetallesCompraModel.getDetalleById(id, (err, detalle) => {
     if (err || !detalle) {
@@ -25,11 +23,10 @@ exports.obtenerPorId = (req, res) => {
   });
 };
 
-// Crear un nuevo detalle de compra
-exports.crear = (req, res) => {
+// 📌 Crear un nuevo detalle de compra
+export const createDetalleCompra = (req, res) => {
   const detalleData = req.body;
 
-  // Validación básica
   if (!detalleData.id_compra || !detalleData.modelo || !detalleData.capacidad || !detalleData.color || !detalleData.cantidad || !detalleData.costo || !detalleData.tipo || !detalleData.marca) {
     return res.status(400).send('Todos los campos son obligatorios');
   }
@@ -43,8 +40,8 @@ exports.crear = (req, res) => {
   });
 };
 
-// Actualizar un detalle de compra
-exports.actualizar = (req, res) => {
+// 📌 Actualizar un detalle de compra
+export const updateDetalleCompra = (req, res) => {
   const id = req.params.id;
   const detalleData = req.body;
 
@@ -57,8 +54,8 @@ exports.actualizar = (req, res) => {
   });
 };
 
-// Eliminar un detalle de compra
-exports.eliminar = (req, res) => {
+// 📌 Eliminar un detalle de compra
+export const deleteDetalleCompra = (req, res) => {
   const id = req.params.id;
 
   DetallesCompraModel.deleteDetalle(id, (err) => {

@@ -1,26 +1,11 @@
-// /routes/proveedorRoutes.js
-const express = require('express');
+import express from 'express';
+import { getProveedores, createProveedor, updateProveedor, deleteProveedor } from '../controllers/ProveedorController.js';
+
 const router = express.Router();
-const ProveedorController = require('../controllers/ProveedorController');
 
+router.get('/', getProveedores);
+router.post('/', createProveedor);
+router.put('/:id', updateProveedor);
+router.delete('/:id', deleteProveedor);
 
-
-// Ruta para obtener todos los proveedores
-router.get('/proveedores', ProveedorController.getProveedores);
-
-// Ruta para crear un nuevo proveedor
-router.post('/proveedores', ProveedorController.createProveedor);
-
-// Ruta para actualizar un proveedor
-router.put('/proveedores/:id', ProveedorController.updateProveedor);
-
-// Ruta para eliminar un proveedor
-router.delete('/proveedores/:id', ProveedorController.deleteProveedor);
-
-// Ruta para obtener un proveedor por ID
-router.get('/proveedores/:id', ProveedorController.getProveedorById); // Revisa que esté bien definida
-
-// Ruta para obtener proveedores con saldo pendiente
-router.get('/con_saldo_pendiente', ProveedorController.getProveedoresConSaldoPendiente);
-
-module.exports = router;
+export default router;

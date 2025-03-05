@@ -1,37 +1,14 @@
-//  backend/config/db.js
+import mysql from 'mysql2/promise';
 
-const mysql = require('mysql2');
-
-// Crear una nueva conexión a la base de datos
-const connection = mysql.createConnection({
-  host: 'localhost',
-  user: 'root',
-  password: 'root',
-  database: 'bd_jamb'
+// 📌 Crear la conexión a la base de datos
+export const pool = mysql.createPool({
+    host: 'localhost',  // Cambiar si la BD está en otro servidor
+    user: 'root',       // Usuario de la BD
+    password: 'root',       // Contraseña de la BD
+    database: 'bd_jamb', // Nombre de la BD
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
 });
 
-// Función para reconectar
-const handleDisconnect = () => {
-
-// Conectar a la base de datos
-connection.connect(err => {
-  if (err) {
-    console.error('Error al conectar a la base de datos:', err);
-    return;
-  }
-  console.log('Conexión exitosa a la base de datos');
-});
-
-connection.on('error', err => {
-  console.error('Error en la conexión a la base de datos:', err);
-  if (err.code === 'PROTOCOL_CONNECTION_LOST') {
-    handleDisconnect(); // Reconectar si la conexión se pierde
-  } else {
-    throw err;
-  }
-});
-};
-
-handleDisconnect();
-// Exportar la conexión para usarla en otros archivos
-module.exports = connection;
+console.log("✅ Conexión a la base de datos establecida correctamente.");

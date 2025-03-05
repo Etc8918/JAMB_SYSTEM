@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "SISTEMA DE GESTION DE COMPRAS Y VENTAS PARA JAMB",
   "main": "backend/index.js",
+  "type": "module", 
   "scripts": {
     "start": "node backend/index.js",
     "dev": "nodemon backend/index.js"

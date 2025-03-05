@@ -1,25 +1,15 @@
-// routes/inventarioRoutes.js
+import express from 'express';
+import { getInventarios, getDetallesPorModelo, createInventario, actualizarStockColores, agregarColor, getCapacidadesPorModelo, getColoresPorCapacidad  } from '../controllers/InventarioController.js';
 
-const express = require('express');
 const router = express.Router();
-const InventarioController = require('../controllers/InventarioController');
 
-// Ruta para obtener todos los inventarios
-router.get('/', InventarioController.getInventarios);
+router.get('/', getInventarios);
+router.get('/detalles/:id_inventario', getDetallesPorModelo);
+router.get('/capacidades/:id_modelo', getCapacidadesPorModelo);
+router.get('/colores/:id_modelo/:capacidad', getColoresPorCapacidad); 
+router.post('/', createInventario); // ✅ Se corrigió la importación
+router.put('/actualizar-stock', actualizarStockColores);
+router.post('/agregar-color', agregarColor);
 
-// Ruta para crear un nuevo inventario
-router.post('/', InventarioController.createInventario);
 
-// Ruta para obtener un inventario por ID
-router.get('/:id', InventarioController.getInventarioById);
-
-// Ruta para actualizar un inventario
-router.put('/:id', InventarioController.updateInventario);
-
-// Ruta para eliminar un inventario
-router.delete('/:id', InventarioController.deleteInventario);
-
-// Ruta para actualizar la cantidad de un color específico de un inventario
-router.put('/:id/color/:color', InventarioController.updateInventarioColor);
-
-module.exports = router;
+export default router;
