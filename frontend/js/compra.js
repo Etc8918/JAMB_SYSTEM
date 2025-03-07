@@ -177,20 +177,33 @@ async function loadProveedores() {
 // ✅ Guardamos los modelos en una lista global para acceder a ellos después
 let modelosLista = [];
 
+// ✅ Cargar modelos (Marca + Modelo) evitando duplicados
 async function loadModelos() {
     try {
         const modelos = await apiFetch("inventario");
         const select = document.getElementById("modeloDetalle");
 
-        select.innerHTML = '<option value="">Seleccione un modelo</option>';
-        modelosLista = modelos; // ✅ Guardamos los modelos en la lista global
+        // Usar un Set para almacenar modelos únicos basados en marca + modelo
+        const modelosUnicos = new Map();
 
         modelos.forEach(modelo => {
+            const clave = `${modelo.marca} - ${modelo.modelo}`; // Clave única
+            if (!modelosUnicos.has(clave)) {
+                modelosUnicos.set(clave, modelo.id_inventario);
+            }
+        });
+
+        // Limpiar el combobox antes de agregar nuevas opciones
+        select.innerHTML = '<option value="">Seleccione un modelo</option>';
+
+        // Agregar modelos únicos al select
+        modelosUnicos.forEach((id_inventario, clave) => {
             const option = document.createElement("option");
-            option.value = modelo.id_inventario;
-            option.textContent = `${modelo.marca.toUpperCase()} - ${modelo.modelo.toUpperCase()}`;
+            option.value = id_inventario;
+            option.textContent = clave; // Solo Marca y Modelo
             select.appendChild(option);
         });
+
     } catch (error) {
         console.error("❌ Error al cargar modelos:", error);
     }
@@ -328,43 +341,46 @@ function abrirModalInventario() {
     modal.show();
 }
 
-async function registrarCompra(event) {
-    event.preventDefault();
-
-    // Capturar datos del formulario
-    const fecha = document.getElementById('fechaCompra').value;
-    const proveedor_id = document.getElementById('proveedorCompra').value;
-
-    // ⚠️ Validar que haya al menos un detalle agregado
+async function registrarCompra() {
     if (detallesCompra.length === 0) {
         Swal.fire("⚠️ Atención", "Debe agregar al menos un detalle a la compra.", "warning");
         return;
     }
 
-    // Crear objeto compra
+    const fecha = document.getElementById("fechaCompra").value;
+    const proveedor_id = document.getElementById("proveedorCompra").value;
+
+    if (!proveedor_id) {
+        Swal.fire("⚠️ Atención", "Debe seleccionar un proveedor.", "warning");
+        return;
+    }
+
+    // 📤 Preparar los datos para enviar al backend
     const compraData = {
         fecha,
         proveedor_id,
-        detalles: detallesCompra // Enviar detalles de compra
+        detalles: detallesCompra,
     };
 
     try {
-        console.log("📤 Enviando compra a la API:", compraData); // 🔍 Depuración
+        console.log("📤 Enviando compra:", JSON.stringify(compraData, null, 2)); // ✅ Depuración
 
-        // ✅ Enviar datos a la API
-        const response = await apiFetch(`compras`, "POST", compraData);
+        const response = await apiFetch("compras", "POST", compraData);
+        console.log("📥 Respuesta de la API:", response);
 
-        // ✅ Verificar si la respuesta es correcta
-        if (!response || response.error) {
-            throw new Error(response?.message || "Error al registrar la compra.");
+        // ✅ Verificar que la API devolvió un id_compra válido
+        if (!response || !response.id_compra) {
+            throw new Error(response?.message || "Error al registrar compra en la base de datos.");
         }
 
         // ✅ Mostrar mensaje de éxito
-        Swal.fire("✅ Éxito", "Compra registrada correctamente", "success");
+        Swal.fire("✅ Éxito", `Compra registrada correctamente con ID: ${response.id_compra}`, "success");
 
-        // ✅ Limpiar la tabla y resetear el formulario
+        // 🧹 Limpiar la tabla y detalles agregados
         detallesCompra = [];
         actualizarTablaDetalles();
+
+        // ❗ Mantener la fecha en el formulario
         const fechaActual = document.getElementById("fechaCompra").value;
         document.getElementById("compraForm").reset();
         document.getElementById("fechaCompra").value = fechaActual;
@@ -375,5 +391,10 @@ async function registrarCompra(event) {
     }
 }
 
+
 // ✅ Agregar evento al botón de Registrar Compra
-document.getElementById("compraForm").addEventListener("submit", registrarCompra);
+document.getElementById("registrarCompraBtn").addEventListener("click", (event) => {
+    event.preventDefault(); // ✅ Evita el comportamiento por defecto
+    registrarCompra(); // ✅ Llama a la función correctamente
+});
+
