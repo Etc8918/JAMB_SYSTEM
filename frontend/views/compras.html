@@ -20,17 +20,15 @@
     <!-- Formulario principal de compra -->
     <form id="compraForm">
       <div class="mb-3">
-        <label for="fechaCompra" class="form-label">Fecha</label>
-        <input type="date" class="form-control" id="fechaCompra" readonly>
+          <label for="fechaCompra" class="form-label">Fecha</label>
+          <input type="date" class="form-control" id="fechaCompra" readonly>
       </div>
       <div class="mb-3">
-        <label for="proveedorCompra" class="form-label">Proveedor</label>
-        <select class="form-control" id="proveedorCompra" required></select>
-        <button type="button" class="btn btn-secondary mt-2" id="addProveedorBtn">Agregar Proveedor</button>
+          <label for="proveedorCompra" class="form-label">Proveedor</label>
+          <select class="form-control" id="proveedorCompra" required></select>
+          <button type="button" class="btn btn-secondary mt-2" id="addProveedorBtn">Agregar Proveedor</button>
       </div>
-      <button type="submit" class="btn btn-primary">Registrar Compra</button>
-    </form>
-
+  </form> 
     <h2 class="mt-4">Detalles de Compra</h2>
     <form id="detalleCompraForm">
       <div class="mb-3">
@@ -74,6 +72,14 @@
       </thead>
       <tbody></tbody>
     </table>
+    
+  </div>
+
+  <div class="text-center mt-4">
+    <button id="registrarCompraBtn" class="btn btn-success btn-lg">
+      <i class="fas fa-check-circle"></i> Registrar Compra
+    </button>
+  
   </div>
 
   <!-- Modal para agregar/editar proveedor -->
