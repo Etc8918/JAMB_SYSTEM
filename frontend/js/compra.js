@@ -6,7 +6,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         const today = new Date().toISOString().split('T')[0]; // Formato YYYY-MM-DD
         fechaCompraInput.value = today;
     }
-    await loadCompras();
     await loadProveedores();
     await loadModelos();
 
@@ -16,61 +15,85 @@ document.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("inventarioForm").addEventListener("submit", guardarInventario);
     document.getElementById('agregarDetalleBtn').addEventListener('click', agregarDetalle);
 
-
-
-    // ✅ Configurar cambio en modelo para cargar capacidades
-    document.getElementById("modeloDetalle").addEventListener("change", async (event) => {
-        await loadCapacidades(event.target.value);
-    });
-
     // ✅ Configurar cambio en capacidad para cargar colores
-    document.getElementById("capacidadDetalle").addEventListener("change", async (event) => {
-        const id_modelo = document.getElementById("modeloDetalle").value;
-        await loadColores(id_modelo, event.target.value);
+    document.getElementById("capacidadDetalle").addEventListener("change", function () {
+        const id_capacidad = this.value;
+        const selectModelo = document.getElementById("modeloDetalle");
+        const id_modelo = selectModelo.value;
+        const selectedOption = selectModelo.options[selectModelo.selectedIndex];
+        const id_tipo = selectedOption.getAttribute("data-id-tipo");
+        const id_marca = selectedOption.getAttribute("data-id-marca");
+
+        console.log("🟡 Enviando a loadColores:", id_modelo, id_capacidad, id_marca, id_tipo);
+        loadColores(id_modelo, id_capacidad, id_tipo, id_marca);
     });
+
 });
 
 // 🛒 Lista de detalles de compra
 let detallesCompra = [];
 
 // ✅ Agregar detalle a la tabla
-function agregarDetalle() {
-    const id_inventario = document.getElementById('modeloDetalle').value;
-    const capacidad = document.getElementById('capacidadDetalle').value;
-    const color = document.getElementById('colorDetalle').value;
+async function agregarDetalle() {
+    const id_modelo = document.getElementById('modeloDetalle').value;
+    const id_capacidad = document.getElementById('capacidadDetalle').value;
+    const id_color = document.getElementById('colorDetalle').value;
     const cantidad = document.getElementById('cantidadDetalle').value;
     const costo = document.getElementById('costoDetalle').value;
 
-    // ⚠️ Validación de campos
-    if (!id_inventario || !capacidad || !color || !cantidad || !costo) {
+    // ⚠️ Validación
+    if (!id_modelo || !id_capacidad || !id_color || !cantidad || !costo) {
         Swal.fire("⚠️ Atención", "Todos los campos son obligatorios.", "warning");
         return;
     }
 
-    // Obtener información adicional de los selects
-    const modeloOption = document.getElementById('modeloDetalle').selectedOptions[0].text;
-    const [marca, modelo] = modeloOption.split(" - "); // ✅ Ahora obtenemos solo Marca y Modelo
+    // 🔎 Buscar id_tipo y id_marca desde el option del modelo
+    const selectModelo = document.getElementById('modeloDetalle');
+    const selectedOption = selectModelo.options[selectModelo.selectedIndex];
+    const id_tipo = selectedOption.getAttribute("data-id-tipo");
+    const id_marca = selectedOption.getAttribute("data-id-marca");
 
-    // Obtener el tipo desde la base de datos en `loadModelos()`
-    const tipo = obtenerTipoPorId(id_inventario);
+    // ✅ Hacer una petición al backend para obtener el id_inventario basado en combinación
+    let id_inventario;
+    try {
+        const resultado = await apiFetch(`compras/id/${id_tipo}/${id_marca}/${id_modelo}/${id_capacidad}/${id_color}`);
 
-    // 🔹 Crear objeto detalle
+        id_inventario = resultado.id_inventario;
+
+        if (!id_inventario) {
+            throw new Error("No se encontró el inventario.");
+        }
+    } catch (error) {
+        console.error("❌ Error al obtener id_inventario:", error);
+        Swal.fire("❌ Error", "No se pudo identificar el inventario en base a los datos seleccionados.", "error");
+        return;
+    }
+
+    // ✅ Obtener textos para mostrar
+    const capacidadTexto = document.getElementById("capacidadDetalle").selectedOptions[0].text;
+    const colorTexto = document.getElementById("colorDetalle").selectedOptions[0].text;
+    const [marcaTexto, modeloTexto] = selectedOption.text.split(" - ");
+    const tipoTexto = obtenerTipoPorId(id_modelo); // Usa tu función auxiliar
+
+    // ✅ Crear detalle
     const detalle = {
         id: detallesCompra.length + 1,
-        tipo: tipo, // ✅ Asegurarnos de que es CELULAR, TABLET o ACCESORIOS
-        marca: marca.trim(),
-        modelo: modelo.trim(),
-        capacidad,
-        color,
-        cantidad: parseInt(cantidad, 10),
+        id_inventario,
+        tipo: tipoTexto,
+        marca: marcaTexto.trim(),
+        modelo: modeloTexto.trim(),
+        id_capacidad,
+        capacidad: capacidadTexto,
+        id_color,
+        color: colorTexto,
+        cantidad: parseInt(cantidad),
         costo: parseFloat(costo).toFixed(2),
     };
 
-    // Agregar detalle a la lista y actualizar la tabla
     detallesCompra.push(detalle);
     actualizarTablaDetalles();
 
-    // ✅ Limpiar los combobox y los campos de cantidad y costo después de agregar el detalle
+    // 🔄 Limpiar campos
     document.getElementById('modeloDetalle').value = "";
     document.getElementById('capacidadDetalle').innerHTML = '<option value="">Seleccione una capacidad</option>';
     document.getElementById('colorDetalle').innerHTML = '<option value="">Seleccione un color</option>';
@@ -90,11 +113,16 @@ function actualizarTablaDetalles() {
     tableBody.innerHTML = '';
 
     if (detallesCompra.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="8" class="text-center">No hay equipos agregados</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="9" class="text-center">No hay equipos agregados</td></tr>';
         return;
     }
 
+    let totalGeneral = 0;
+
     detallesCompra.forEach((detalle, index) => {
+        const totalPorEquipo = detalle.cantidad * parseFloat(detalle.costo);
+        totalGeneral += totalPorEquipo;
+
         const row = document.createElement('tr');
         row.innerHTML = `
             <td>${detalle.tipo}</td>
@@ -104,6 +132,7 @@ function actualizarTablaDetalles() {
             <td>${detalle.color}</td>
             <td>${detalle.cantidad}</td>
             <td>$${detalle.costo}</td>
+            <td>$${totalPorEquipo.toFixed(2)}</td>
             <td>
                 <button class="btn btn-sm btn-warning" onclick="editarCantidad(${index})">Editar</button>
                 <button class="btn btn-sm btn-danger" onclick="eliminarDetalle(${index})">Eliminar</button>
@@ -111,7 +140,16 @@ function actualizarTablaDetalles() {
         `;
         tableBody.appendChild(row);
     });
+
+    // Agregar fila del total general
+    const totalRow = document.createElement('tr');
+    totalRow.innerHTML = `
+        <td colspan="7" class="text-end fw-bold">Total General:</td>
+        <td colspan="2" class="fw-bold text-success">$${totalGeneral.toFixed(2)}</td>
+    `;
+    tableBody.appendChild(totalRow);
 }
+
 
 // ✅ Eliminar un detalle agregado
 window.eliminarDetalle = function (index) {
@@ -140,21 +178,6 @@ window.editarCantidad = function (index) {
         }
     });
 };
-
-
-// ✅ Cargar compras en la tabla
-async function loadCompras() {
-    try {
-        const compras = await apiFetch("compras");
-        // Si no necesitas renderizar compras, solo realiza la solicitud sin llamar renderComprasTable()
-        console.log("📥 Compras recibidas:", compras); // Para depuración
-    } catch (error) {
-        console.error("❌ Error al cargar compras:", error);
-    }
-}
-
-
-
 // ✅ Cargar proveedores en el combobox
 async function loadProveedores() {
     try {
@@ -180,75 +203,80 @@ let modelosLista = [];
 // ✅ Cargar modelos (Marca + Modelo) evitando duplicados
 async function loadModelos() {
     try {
-        const modelos = await apiFetch("inventario");
+        const modelos = await apiFetch("compras/modelos");
+        console.log("📦 Modelos cargados:", modelos);
         const select = document.getElementById("modeloDetalle");
-
-        // Usar un Set para almacenar modelos únicos basados en marca + modelo
-        const modelosUnicos = new Map();
-
-        modelos.forEach(modelo => {
-            const clave = `${modelo.marca} - ${modelo.modelo}`; // Clave única
-            if (!modelosUnicos.has(clave)) {
-                modelosUnicos.set(clave, modelo.id_inventario);
-            }
-        });
-
-        // Limpiar el combobox antes de agregar nuevas opciones
+        renderModelos(modelos);
         select.innerHTML = '<option value="">Seleccione un modelo</option>';
 
-        // Agregar modelos únicos al select
-        modelosUnicos.forEach((id_inventario, clave) => {
+        modelos.forEach(modelo => {
             const option = document.createElement("option");
-            option.value = id_inventario;
-            option.textContent = clave; // Solo Marca y Modelo
+            option.value = modelo.id_modelo;
+            option.textContent = `${modelo.nombre_marca} - ${modelo.nombre_modelo}`;
+            option.setAttribute("data-id-marca", modelo.id_marca);
+            option.setAttribute("data-id-tipo", modelo.id_tipo);
             select.appendChild(option);
         });
+
 
     } catch (error) {
         console.error("❌ Error al cargar modelos:", error);
     }
 }
 
-
-
-
-
-
 // ✅ Cargar capacidades basadas en modelo
-async function loadCapacidades(id_modelo) {
-    try {
-        const capacidades = await apiFetch(`inventario/capacidades/${id_modelo}`);
-        const select = document.getElementById("capacidadDetalle");
+async function loadCapacidades(id_tipo, id_marca, id_modelo) {
 
-        select.innerHTML = '<option value="">Seleccione una capacidad</option>';
-        capacidades.forEach(capacidad => {
+    try {
+        console.log("🟡 Enviando id_modelo:", id_modelo, id_marca, id_modelo);
+        const capacidades = await apiFetch(`compras/capacidades/${id_tipo}/${id_marca}/${id_modelo}`);
+        const selectCapacidad = document.getElementById("capacidadDetalle");
+        const selectColor = document.getElementById("colorDetalle");
+
+        selectCapacidad.innerHTML = '<option value="">Seleccione una capacidad</option>';
+        selectColor.innerHTML = '<option value="">Seleccione un color</option>'; // Limpia colores
+
+        capacidades.forEach(cap => {
             const option = document.createElement("option");
-            option.value = capacidad.capacidad;
-            option.textContent = capacidad.capacidad;
-            select.appendChild(option);
+            option.value = cap.id_capacidad;
+            option.textContent = cap.capacidad;
+            selectCapacidad.appendChild(option);
         });
+
+        console.log("✅ Capacidades cargadas:", capacidades);
     } catch (error) {
         console.error("❌ Error al cargar capacidades:", error);
     }
 }
 
-// ✅ Cargar colores basados en modelo y capacidad
-async function loadColores(id_modelo, capacidad) {
-    try {
-        const colores = await apiFetch(`inventario/colores/${id_modelo}/${capacidad}`);
-        const select = document.getElementById("colorDetalle");
 
-        select.innerHTML = '<option value="">Seleccione un color</option>';
+
+// ✅ Cargar colores basados en modelo y capacidad
+async function loadColores(id_modelo, id_capacidad, id_tipo, id_marca) {
+
+    if (!id_tipo || !id_marca || !id_modelo || !id_capacidad) {
+        console.error("❌ Error: Parámetros inválidos para cargar colores.", { id_modelo, id_capacidad, id_tipo, id_marca });
+        return;
+    }
+
+    try {
+        const colores = await apiFetch(`compras/colores/${id_tipo}/${id_marca}/${id_modelo}/${id_capacidad}`);
+        const selectColor = document.getElementById("colorDetalle");
+
+        selectColor.innerHTML = '<option value="">Seleccione un color</option>';
         colores.forEach(color => {
+            console.log("🎨 Color cargado:", color);
             const option = document.createElement("option");
-            option.value = color.color;
-            option.textContent = color.color;
-            select.appendChild(option);
+            option.value = color.id_color;  // ✅ Utiliza el ID del color
+            option.textContent = color.nombre_color;
+            selectColor.appendChild(option);
         });
     } catch (error) {
         console.error("❌ Error al cargar colores:", error);
     }
 }
+
+
 
 // ✅ Guardar proveedor en la BD
 async function guardarProveedor(event) {
@@ -296,7 +324,7 @@ async function guardarInventario(event) {
         return;
     }
 
-    const inventarioData = { tipo, marca, modelo, capacidad, color, cantidad }; // 📌 Se envía cantidad
+    const inventarioData = { tipo, marca, modelo, capacidad, color, cantidad };
 
     try {
         console.log("📤 Enviando datos a la API:", inventarioData); // 🔍 Depuración
@@ -398,3 +426,42 @@ document.getElementById("registrarCompraBtn").addEventListener("click", (event) 
     registrarCompra(); // ✅ Llama a la función correctamente
 });
 
+const selectModelo = document.getElementById("modeloDetalle"); // ✅ Solo una vez
+
+selectModelo.addEventListener("change", function () {
+    const selectedOption = this.options[this.selectedIndex];
+
+    const id_modelo = this.value;
+    const id_tipo = selectedOption.getAttribute("data-id-tipo");
+    const id_marca = selectedOption.getAttribute("data-id-marca");
+
+    console.log("🟡 Enviando IDs a loadCapacidades:", id_tipo, id_marca, id_modelo);
+
+    loadCapacidades(id_tipo, id_marca, id_modelo);
+});
+
+
+
+function renderModelos(modelos) {
+    const select = document.getElementById("modeloDetalle");
+    select.innerHTML = '<option value="">Seleccione un modelo</option>';
+
+    modelos.forEach(m => {
+        const option = document.createElement("option");
+        option.value = m.id_modelo;
+        option.textContent = `${m.nombre_marca} - ${m.nombre_modelo}`;
+        option.setAttribute("data-id-tipo", m.id_tipo);
+        option.setAttribute("data-id-marca", m.id_marca);
+        select.appendChild(option);
+    });
+}
+
+async function obtenerIdInventario(id_tipo, id_marca, id_modelo, id_capacidad, id_color) {
+    try {
+        const inventario = await apiFetch(`inventario/obtener-id/${id_tipo}/${id_marca}/${id_modelo}/${id_capacidad}/${id_color}`);
+        return inventario.id_inventario;
+    } catch (error) {
+        console.error("❌ Error al obtener id_inventario:", error);
+        return null;
+    }
+}

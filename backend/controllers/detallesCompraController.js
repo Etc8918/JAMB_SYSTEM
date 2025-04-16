@@ -27,18 +27,30 @@ export const getDetalleCompraById = (req, res) => {
 export const createDetalleCompra = (req, res) => {
   const detalleData = req.body;
 
-  if (!detalleData.id_compra || !detalleData.modelo || !detalleData.capacidad || !detalleData.color || !detalleData.cantidad || !detalleData.costo || !detalleData.tipo || !detalleData.marca) {
-    return res.status(400).send('Todos los campos son obligatorios');
+  // ✅ Validación con campos normalizados
+  if (
+    !detalleData.id_compra ||
+    !detalleData.id_tipo ||
+    !detalleData.id_marca ||
+    !detalleData.id_modelo ||
+    !detalleData.id_capacidad ||
+    !detalleData.id_color ||
+    !detalleData.cantidad ||
+    !detalleData.costo
+  ) {
+    return res.status(400).send('Todos los campos son obligatorios (usando IDs)');
   }
 
   DetallesCompraModel.createDetalle(detalleData, (err, insertId) => {
     if (err) {
+      console.error("❌ Error al crear detalle de compra:", err);
       res.status(500).send('Error al crear el detalle de compra');
     } else {
       res.status(201).json({ message: 'Detalle de compra creado exitosamente', id: insertId });
     }
   });
 };
+
 
 // 📌 Actualizar un detalle de compra
 export const updateDetalleCompra = (req, res) => {
@@ -66,3 +78,5 @@ export const deleteDetalleCompra = (req, res) => {
     }
   });
 };
+
+

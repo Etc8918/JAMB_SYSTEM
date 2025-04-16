@@ -27,10 +27,22 @@ const DetallesCompraModel = {
 
   // 📌 Crear un nuevo detalle de compra
   createDetalle: (detalleData, callback) => {
-    const { id_compra, modelo, capacidad, color, cantidad, costo, tipo, marca } = detalleData;
+    const {
+      id_compra,
+      id_tipo,
+      id_marca,
+      id_modelo,
+      id_capacidad,
+      id_color,
+      cantidad,
+      costo
+    } = detalleData;
+  
     pool.query(
-      "INSERT INTO detalles_compra (id_compra, modelo, capacidad, color, cantidad, costo, tipo, marca) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-      [id_compra, modelo, capacidad, color, cantidad, costo, tipo, marca],
+      `INSERT INTO detalles_compra 
+      (id_compra, id_tipo, id_marca, id_modelo, id_capacidad, id_color, cantidad, costo_unitario) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id_compra, id_tipo, id_marca, id_modelo, id_capacidad, id_color, cantidad, costo],
       (err, result) => {
         if (err) {
           console.error("❌ Error al insertar detalle de compra:", err);
@@ -41,6 +53,7 @@ const DetallesCompraModel = {
       }
     );
   },
+  
 
   // 📌 Actualizar un detalle de compra
   updateDetalle: (id, detalleData, callback) => {

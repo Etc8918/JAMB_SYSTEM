@@ -97,3 +97,31 @@ export const deleteProveedor = async (req, res) => {
         res.status(500).json({ message: "Error al eliminar proveedor." });
     }
 };
+
+export const getProveedoresConSaldoPendiente = async (req, res) => {
+    try {
+      const [rows] = await pool.query(`
+        SELECT 
+          p.id_proveedor,
+          p.nombre AS proveedor_nombre,
+          SUM(
+            IFNULL(c.costo_total, 0) - IFNULL((
+              SELECT SUM(ap.monto_abono)
+              FROM abonos_proveedores ap
+              WHERE ap.id_compra = c.id_compra
+            ), 0)
+          ) AS saldo_pendiente_total
+        FROM compras c
+        INNER JOIN proveedores p ON c.proveedor_id = p.id_proveedor
+        GROUP BY p.id_proveedor, p.nombre
+        
+      `);
+  
+      res.json(rows);
+    } catch (error) {
+      console.error("❌ Error al obtener proveedores con saldo pendiente:", error.sqlMessage || error.message);
+      res.status(500).json({ message: 'Error al obtener proveedores con saldo pendiente' });
+    }
+  };
+  
+  

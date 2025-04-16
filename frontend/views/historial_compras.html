@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Historial de Compras del Proveedor</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <style>
+    body { padding: 2rem; }
+  </style>
+</head>
+<body>
+  <h2>📋 Historial de Compras</h2>
+  <div id="contenedorComprasHistorial"></div>
+
+  <script src="detalles_compra.js"></script>
+  <script>
+    // Obtener el proveedor_id desde la URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const proveedorId = urlParams.get('proveedor_id');
+
+    const contenedor = document.getElementById('contenedorComprasHistorial');
+
+    function cargarHistorial() {
+      fetch(`http://localhost:3000/api/compras/compras_por_proveedor/${proveedorId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (!Array.isArray(data)) {
+            contenedor.innerHTML = '<div class="alert alert-danger">❌ Error: respuesta inválida del servidor.</div>';
+            return;
+          }
+
+          contenedor.innerHTML = '<h5>Total de compras: ' + data.length + '</h5><hr />';
+          renderTablaCompras(data, contenedor);
+        })
+        .catch(err => {
+          console.error("❌ Error al cargar historial:", err);
+          contenedor.innerHTML = '<div class="alert alert-danger">❌ Error al cargar el historial de compras.</div>';
+        });
+    }
+
+    cargarHistorial();
+  </script>
+</body>
+</html>
