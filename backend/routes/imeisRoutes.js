@@ -1,10 +1,10 @@
 import express from 'express';
-import { registrarImeis, getCantidadYRegistrados,getImeisPorDetalle  } from '../controllers/ImeisController.js';
+import { getCantidadYRegistrados,getImeisPorDetalle, guardarImeis  } from '../controllers/ImeisController.js';
 
 const router = express.Router();
 
-router.post('/:id_detalle', registrarImeis);
 router.get('/:id_detalle/cantidad', getCantidadYRegistrados);
 router.get('/:id_detalle', getImeisPorDetalle);
+router.post("/:id", guardarImeis);
 
 export default router;

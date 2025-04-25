@@ -462,22 +462,33 @@ formRegistrarImeis.addEventListener("submit", async function (e) {
   e.preventDefault();
 
   const idDetalle = document.getElementById("detalleCompraId").value;
-  const imei1List = document.getElementById("textareaImei1").value.trim().split("\n").filter(l => l);
+  const imei1List = document.getElementById("textareaImei1").value.trim().split("\n").filter(l => l.trim());
   const imei2List = document.getElementById("textareaImei2").value.trim().split("\n");
 
-  const cantidadIngresada = imei1List.length;
+  // Obtener IMEIs originales desde memoria
+  const originalImeis = window.imeisOriginales || [];
 
-  // Obtener cuántos equipos se compraron para ese detalle
-  const response = await fetch(`/api/detalles_compra/${idDetalle}/cantidad`);
-  const { cantidad_total, imeis_registrados } = await response.json();
-  const disponibles = cantidad_total - imeis_registrados;
+  const nuevos = imei1List.filter((imei, i) => !originalImeis.some(d => d.imei1 === imei && d.imei2 === (imei2List[i]?.trim() || null)));
+  const eliminados = originalImeis.filter(oi => !imei1List.includes(oi.imei1));
+  const reemplazados = originalImeis.filter((oi, i) => imei1List[i] && imei1List[i] !== oi.imei1);
 
-  if (cantidadIngresada > disponibles) {
-    mostrarAlertaIMEI(`Estás intentando registrar ${cantidadIngresada}, pero solo quedan ${disponibles} disponibles.`);
-    return;
-  }
+  let resumen = "";
+  if (nuevos.length) resumen += `✅ ${nuevos.length} IMEIs nuevos agregados\n`;
+  if (eliminados.length) resumen += `❌ ${eliminados.length} IMEIs eliminados\n`;
+  if (reemplazados.length) resumen += `🔁 ${reemplazados.length} IMEIs reemplazados\n`;
 
-  // Vincular imei1 con imei2
+  const confirm = await Swal.fire({
+    title: "¿Confirmar cambios en IMEIs?",
+    text: resumen || "No se detectaron cambios.",
+    icon: "question",
+    showCancelButton: true,
+    confirmButtonText: "Guardar",
+    cancelButtonText: "Cancelar"
+  });
+
+  if (!confirm.isConfirmed) return;
+
+  // Vincular imei1 con imei2 para enviar
   const listaFinal = imei1List.map((imei1, idx) => ({
     imei1,
     imei2: imei2List[idx]?.trim() || null
@@ -491,14 +502,14 @@ formRegistrarImeis.addEventListener("submit", async function (e) {
 
   if (res.ok) {
     modalRegistrarImeis.hide();
-    Swal.fire("✅ Éxito", "IMEIs registrados correctamente", "success");
+    Swal.fire("✅ Guardado", resumen || "IMEIs actualizados.", "success");
     actualizarContadorImeis(idDetalle);
-
   } else {
     const err = await res.json();
-    mostrarAlertaIMEI(err.message || "Error al registrar IMEIs");
+    mostrarAlertaIMEI(err.message || "Error al guardar IMEIs");
   }
 });
+
 
 function mostrarAlertaIMEI(msg) {
   const alerta = document.getElementById("alertImeiError");
