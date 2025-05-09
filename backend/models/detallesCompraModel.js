@@ -82,8 +82,24 @@ const DetallesCompraModel = {
         callback(null);
       }
     });
-  }
+  },
+  updateCostoSolo: (id, nuevoCosto, callback) => {
+   const query = "UPDATE detalles_compra SET costo = ? WHERE id_detalle = ?";
+   // pool es un mysql2/promise pool, así que .query() devuelve promesa
+   pool.query(query, [nuevoCosto, id])
+     .then(([result]) => {
+       // aquí ya se ejecutó el UPDATE, invocamos el callback de éxito
+       callback(null);
+     })
+     .catch(err => {
+       console.error("❌ Error al actualizar solo el costo:", err);
+       callback(err);
+     });
+ }
+  
 };
+
 
 // ✅ Exportar correctamente el modelo para ES6
 export default DetallesCompraModel;
+

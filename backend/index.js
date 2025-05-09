@@ -32,7 +32,7 @@ app.use('/api/proveedores', proveedorRoutes);
 app.use('/api/clientes', clienteRoutes);
 app.use('/api/inventario', inventarioRoutes);
 app.use('/api/compras', compraRoutes);
-app.use('/api/detalles_compra', detallesCompraRoutes); // ✅ Asegurar que se está usando correctamente
+app.use('/api/detalles-compra', detallesCompraRoutes); // ✅ Asegurar que se está usando correctamente
 app.use('/api/imeis', imeisRoutes);
 app.use(errorHandler);
 // Servidor

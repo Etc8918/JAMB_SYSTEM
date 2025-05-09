@@ -1,5 +1,4 @@
 import DetallesCompraModel from '../models/detallesCompraModel.js'; // ✅ Importación corregida
-
 // 📌 Obtener todos los detalles de compra
 export const getDetallesCompra = (req, res) => {
   DetallesCompraModel.getAllDetalles((err, detalles) => {
@@ -79,4 +78,21 @@ export const deleteDetalleCompra = (req, res) => {
   });
 };
 
+
+export const actualizarCosto = (req, res) => {
+   console.log(`🔥 PUT /api/detalles-compra/${req.params.id}/costo ->`, req.body);
+  const { id } = req.params;
+  const { costo } = req.body;
+
+  DetallesCompraModel.updateCostoSolo(id, costo, (err) => {
+    if (err) {
+      return res
+      .status(500)
+      .json({ message: "Error al actualizar el costo", error: err.message });
+    }
+    return res
+     .status(200)
+     .json({ message: "Costo actualizado correctamente" });
+  });
+};
 

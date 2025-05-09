@@ -51,11 +51,11 @@
           <div class="modal-body">
             <!-- Solo el campo de costo será editable -->
             <div class="mb-3">
-              <label for="nuevo_costo" class="form-label">Nuevo Costo</label>
-              <input type="number" step="0.01" class="form-control" id="nuevo_costo" name="nuevo_costo" required>
+              <label for="nuevoCostoInput" class="form-label">Nuevo Costo</label>
+              <input type="number" step="0.01" class="form-control" id="nuevoCostoInput" name="nuevoCostoInput" required>
             </div>
             <!-- Campo oculto para identificar el detalle -->
-            <input type="hidden" id="id_detalle_editar" name="id_detalle_editar">
+            <input type="hidden" id="idDetalleEditar" name="idDetalleEditar">
           </div>
           <div class="modal-footer">
             <button type="submit" class="btn btn-primary">Guardar</button>
@@ -73,6 +73,7 @@
         <h5 class="modal-title" id="modalRegistrarImeisLabel">Registrar IMEIs</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
       </div>
+        
       <div class="modal-body">
         <input type="hidden" id="detalleCompraId" />
         <div class="mb-3">
@@ -92,6 +93,7 @@
     </form>
   </div>
 </div>
+
 
 
 
