@@ -99,29 +99,34 @@ export const deleteProveedor = async (req, res) => {
 };
 
 export const getProveedoresConSaldoPendiente = async (req, res) => {
-    try {
-      const [rows] = await pool.query(`
-        SELECT 
-          p.id_proveedor,
-          p.nombre AS proveedor_nombre,
-          SUM(
-            IFNULL(c.costo_total, 0) - IFNULL((
-              SELECT SUM(ap.monto_abono)
-              FROM abonos_proveedores ap
-              WHERE ap.id_compra = c.id_compra
-            ), 0)
-          ) AS saldo_pendiente_total
-        FROM compras c
-        INNER JOIN proveedores p ON c.proveedor_id = p.id_proveedor
-        GROUP BY p.id_proveedor, p.nombre
-        
-      `);
-  
-      res.json(rows);
-    } catch (error) {
-      console.error("❌ Error al obtener proveedores con saldo pendiente:", error.sqlMessage || error.message);
-      res.status(500).json({ message: 'Error al obtener proveedores con saldo pendiente' });
-    }
-  };
+  try {
+    const [rows] = await pool.query(`
+      SELECT
+        p.id_proveedor,
+        UPPER(p.nombre) AS proveedor_nombre,
+        -- Suma cantidad * costo de todos los detalles
+        IFNULL(SUM(d.cantidad * d.costo), 0)          AS costo_total,
+        -- Suma de los abonos hechos (0 si no hay)
+        IFNULL(SUM(ap.monto_abono), 0)                AS total_abonado,
+        -- Saldo pendiente = total de detalles menos abonos
+        IFNULL(SUM(d.cantidad * d.costo), 0)
+        - IFNULL(SUM(ap.monto_abono), 0)              AS saldo_pendiente_total
+      FROM proveedores p
+      LEFT JOIN compras c 
+        ON c.proveedor_id = p.id_proveedor
+      LEFT JOIN detalles_compra d 
+        ON d.id_compra = c.id_compra
+      LEFT JOIN abonos_proveedores ap 
+        ON ap.id_compra = c.id_compra
+      GROUP BY p.id_proveedor, p.nombre
+      ORDER BY p.nombre ASC
+    `);
+
+    return res.json(rows);
+  } catch (error) {
+    console.error("❌ Error en getProveedoresConSaldoPendiente:", error.sqlMessage || error.message);
+    return res.status(500).json({ message: 'Error al obtener saldos pendientes' });
+  }
+};
   
   

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="UTF-8">
   <title>Proveedores y Compras - JAMB System</title>
@@ -11,14 +12,16 @@
     .cursor-pointer {
       cursor: pointer;
     }
+
     .table-hover tbody tr:hover {
       background-color: #f5f5f5;
     }
   </style>
 
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 </head>
+
 <body>
   <div class="container mt-5">
     <h1>Proveedores y Saldos Pendientes</h1>
@@ -40,59 +43,65 @@
   </div>
 
   <!-- Modal para Editar Costo de un Detalle de Compra -->
-  <div class="modal fade" id="modalEditarCosto" tabindex="-1" aria-labelledby="modalEditarCostoLabel" aria-hidden="true">
+  <div class="modal fade" id="modalEditarCosto" tabindex="-1" aria-labelledby="modalEditarCostoLabel"
+    >
     <div class="modal-dialog">
       <div class="modal-content">
         <form id="formEditarCosto">
-          <div class="modal-header">
-            <h5 class="modal-title" id="modalEditarCostoLabel">Editar Costo</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-          </div>
-          <div class="modal-body">
-            <!-- Solo el campo de costo será editable -->
-            <div class="mb-3">
-              <label for="nuevoCostoInput" class="form-label">Nuevo Costo</label>
-              <input type="number" step="0.01" class="form-control" id="nuevoCostoInput" name="nuevoCostoInput" required>
-            </div>
-            <!-- Campo oculto para identificar el detalle -->
-            <input type="hidden" id="idDetalleEditar" name="idDetalleEditar">
-          </div>
-          <div class="modal-footer">
-            <button type="submit" class="btn btn-primary">Guardar</button>
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-          </div>
-        </form>
+  <!-- 1) Campos ocultos -->
+  <input type="hidden" id="idDetalleEditar" name="idDetalleEditar">
+  <input type="hidden" id="idCompraEditar"  name="idCompraEditar">
+  <input type="hidden" id="idProveedorEditar" name="idProveedorEditar">
+
+  <!-- 2) Campo editable de costo -->
+  <div class="modal-body">
+    <div class="mb-3">
+      <label for="nuevoCostoInput" class="form-label">Nuevo Costo</label>
+      <input type="number" step="0.01" class="form-control"
+             id="nuevoCostoInput" name="nuevoCostoInput" required>
+    </div>
+  </div>
+
+  <!-- 3) Footer con botones -->
+  <div class="modal-footer">
+    <button type="submit" class="btn btn-primary">Guardar</button>
+    <button type="button" class="btn btn-secondary"
+            data-bs-dismiss="modal">Cancelar</button>
+  </div>
+</form>
+
       </div>
     </div>
   </div>
   <!-- Modal registrar IMEIs -->
-<div class="modal fade" id="modalRegistrarImeis" tabindex="-1" aria-labelledby="modalRegistrarImeisLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg">
-    <form class="modal-content" id="formRegistrarImeis">
-      <div class="modal-header">
-        <h5 class="modal-title" id="modalRegistrarImeisLabel">Registrar IMEIs</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-      </div>
-        
-      <div class="modal-body">
-        <input type="hidden" id="detalleCompraId" />
-        <div class="mb-3">
-          <label class="form-label">IMEI 1 (uno por línea, obligatorio)</label>
-          <textarea class="form-control" id="textareaImei1" rows="6" required></textarea>
+  <div class="modal fade" id="modalRegistrarImeis" tabindex="-1" aria-labelledby="modalRegistrarImeisLabel"
+    aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <form class="modal-content" id="formRegistrarImeis">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalRegistrarImeisLabel">Registrar IMEIs</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
         </div>
-        <div class="mb-3">
-          <label class="form-label">IMEI 2 (uno por línea, opcional)</label>
-          <textarea class="form-control" id="textareaImei2" rows="6"></textarea>
+
+        <div class="modal-body">
+          <input type="hidden" id="detalleCompraId" />
+          <div class="mb-3">
+            <label class="form-label">IMEI 1 (uno por línea, obligatorio)</label>
+            <textarea class="form-control" id="textareaImei1" rows="6" required></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">IMEI 2 (uno por línea, opcional)</label>
+            <textarea class="form-control" id="textareaImei2" rows="6"></textarea>
+          </div>
+          <div id="alertImeiError" class="alert alert-danger d-none"></div>
         </div>
-        <div id="alertImeiError" class="alert alert-danger d-none"></div>
-      </div>
-      <div class="modal-footer">
-        <button type="submit" class="btn btn-primary">Guardar IMEIs</button>
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-      </div>
-    </form>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">Guardar IMEIs</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        </div>
+      </form>
+    </div>
   </div>
-</div>
 
 
 
@@ -103,4 +112,5 @@
   <!-- Tu archivo JavaScript personalizado -->
   <script src="../js/detalles_compra.js"></script>
 </body>
+
 </html>

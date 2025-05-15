@@ -39,18 +39,43 @@ document.addEventListener('DOMContentLoaded', function () {
   const idDetalleEditar = document.getElementById('idDetalleEditar');
   const nuevoCostoInput = document.getElementById('nuevoCostoInput');
   const alertContainer = document.getElementById('alertContainer');
+
+function recalcSaldoProveedor(idProveedor) {
+  const filaProv = document.querySelector(`tr[data-proveedor-id="${idProveedor}"]`);
+  if (!filaProv) return;
+  const filaCompras = filaProv.nextElementSibling;            // la fila que contiene la tabla de compras
+  if (!filaCompras) return;
+  const tabla = filaCompras.querySelector('table.table-bordered');
+  if (!tabla) return;
+
+  let totalPendiente = 0;
+  tabla.querySelectorAll('tbody tr[data-id-compra]').forEach(fila => {
+    const txt = fila.querySelector('td.saldoPendiente')?.textContent || '0';
+    totalPendiente += parseFloat(txt);
+  });
+
+  filaProv.querySelector('td:nth-child(2)').textContent = totalPendiente.toFixed(2);
+}
+
+
+
   // 3) Handler de submit
   formEditarCosto.addEventListener("submit", async function (e) {
     e.preventDefault();
-    const id = idDetalleEditar.value;
-    const nuevoCosto = parseFloat(nuevoCostoInput.value);
+    const idDetalle = document.getElementById('idDetalleEditar').value;
+    const idCompra = document.getElementById('idCompraEditar').value;
+    const nuevoCosto = parseFloat(document.getElementById('nuevoCostoInput').value);
+    const idProv = document.getElementById('idProveedorEditar').value;
+    const btnEditar = document.querySelector(`.btnEditarCosto[data-id-detalle="${idDetalle}"]`);
+    const oldCost = parseFloat(btnEditar.dataset.costo);
+    // Aquí ya tenemos la cantidad sin buscar filas en el DOM
+    const cantidad = parseFloat(btnEditar.dataset.cantidad) || 0;
 
     if (!nuevoCosto || isNaN(nuevoCosto) || nuevoCosto <= 0) {
       mostrarAlerta('Por favor, ingresa un costo válido.', 'warning');
       return;
     }
-
-    const confirm = await Swal.fire({
+    const s = await Swal.fire({
       title: '¿Confirmar nuevo costo?',
       text: `Estás por establecer el costo en S/. ${nuevoCosto.toFixed(2)}`,
       icon: 'question',
@@ -58,11 +83,10 @@ document.addEventListener('DOMContentLoaded', function () {
       confirmButtonText: 'Sí, actualizar',
       cancelButtonText: 'Cancelar'
     });
-    if (!confirm.isConfirmed) return;
-
+    if (!s.isConfirmed) return;
     try {
-      // ——— Actualiza en backend y en la tabla…
-      const res = await fetch(`/api/detalles-compra/${id}/costo`, {
+      // 1) Actualiza en backend
+      const res = await fetch(`/api/detalles-compra/${idDetalle}/costo`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ costo: nuevoCosto })
@@ -70,37 +94,26 @@ document.addEventListener('DOMContentLoaded', function () {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Error desconocido');
 
-      // ——— Actualiza celdas y botones (igual que antes)…
+      // 2) Refleja el nuevo costo en la tabla de detalles
+      document.querySelectorAll(`[data-id-detalle="${idDetalle}"] td`)
+        .forEach((td, i) => i === 6 && (td.textContent = nuevoCosto.toFixed(2)));
+      document.querySelectorAll(`tr[data-id-detalle-expandido="${idDetalle}"] td`)
+        .forEach((td, i) => i === 6 && (td.textContent = nuevoCosto.toFixed(2)));
+      document.querySelectorAll(`.btnEditarCosto[data-id-detalle="${idDetalle}"]`)
+        .forEach(btn => btn.setAttribute('data-costo', nuevoCosto.toFixed(2)));
 
-      // ——— Actualiza la celda en la tabla normal
-      const fila = document.querySelector(`[data-id-detalle="${id}"]`);
-      if (fila) {
-        const celdas = fila.querySelectorAll("td");
-        if (celdas.length >= 7) {
-          celdas[6].textContent = nuevoCosto.toFixed(2);
-        }
-      }
-      // ——— Actualiza las filas expandidas
-      document
-        .querySelectorAll(`tr[data-id-detalle-expandido="${id}"]`)
-        .forEach(filaExpandida => {
-          const celdas = filaExpandida.querySelectorAll("td");
-          if (celdas.length >= 7) {
-            celdas[6].textContent = nuevoCosto.toFixed(2);
-          }
-        });
-      // ——— Sincroniza el atributo data-costo de los botones
-      document
-        .querySelectorAll(`.btnEditarCosto[data-id-detalle="${id}"]`)
-        .forEach(btn => {
-          btn.setAttribute('data-costo', nuevoCosto.toFixed(2));
-        });
+      // 3) Quita el focus del botón de cerrar para no romper aria-hidden
+      document.querySelector('#modalEditarCosto .btn-close')?.blur();
+      // 4) Cierra el modal y muestra la alerta de éxito
 
 
-      // ——> 4) Cierra el modal con Bootstrap (sin limpieza manual aquí)
+
+      // 4) Quitamos foco del btn-close para evitar warning de aria-hidden
+      document.querySelector('#modalEditarCosto .btn-close')?.blur();
+      // 5) Cerramos el modal
+      nuevoCostoInput.blur();
       modalEditarCosto.hide();
-
-      // ——> 5) Muestra alerta de éxito
+      // 6) Mostramos alerta de éxito
       await Swal.fire({
         icon: 'success',
         title: '✅ Costo actualizado correctamente',
@@ -108,37 +121,43 @@ document.addEventListener('DOMContentLoaded', function () {
         showConfirmButton: false
       });
 
-      // ——> 6) Recalcula totales y saldos
-      const filaCompra = document
-        .querySelector(`tr[data-id-detalle="${id}"]`)?.closest('tr[data-id-compra]') ||
-        document
-          .querySelector(`tr[data-id-detalle-expandido="${id}"]`)?.closest('tr[data-id-compra]');
-      const idCompra = filaCompra?.dataset?.idCompra;
-      if (idCompra) actualizarCostoTotalYSaldo(idCompra);
+      // 7.1) Actualiza la fila de la compra
+      actualizarCostoTotalYSaldo(idCompra);
+      // 7.2) Recalcula el saldo TOTAL del proveedor
+      recalcSaldoProveedor(idProv);
+
+
+
+
+
+
+
 
     } catch (error) {
       console.error('Error al actualizar el costo:', error);
       mostrarAlerta('Error al actualizar el costo.', 'danger');
     }
-  });
+
+
+
+  }
+  );
+
+
+  // ——— Mantén el resto (modalEnUso, abrirModalEditarCosto, cargarProveedores…)
   let modalEnUso = false;
   window.abrirModalEditarCosto = function (id, costoActual) {
     if (modalEnUso) return;
     modalEnUso = true;
-
-    // 🔽 Aquí rescatamos las refs que están dentro de DOMContentLoaded
-    const idDetalleEditar = document.getElementById('idDetalleEditar');
-    const nuevoCostoInput = document.getElementById('nuevoCostoInput');
-
-    idDetalleEditar.value = id;
-    nuevoCostoInput.value = costoActual;
+    document.getElementById('idDetalleEditar').value = id;
+    document.getElementById('nuevoCostoInput').value = costoActual;
     modalEditarCosto.show();
-
     setTimeout(() => { modalEnUso = false; }, 500);
   };
 
-  // Cargar los proveedores al iniciar
+  // Carga inicial
   cargarProveedoresConSaldoPendiente();
+
 
 });
 
@@ -153,14 +172,31 @@ function mostrarAlerta(mensaje, tipo) {
 }
 
 // Reasignar evento global para cualquier botón "Editar Costo"
+// ———  Reasignar evento click a cualquier botón .btnEditarCosto
 document.addEventListener('click', function (e) {
   const btn = e.target.closest('.btnEditarCosto');
-  if (btn) {
-    const id = btn.getAttribute('data-id-detalle');
-    const costo = btn.getAttribute('data-costo') || btn.textContent.trim();
-    abrirModalEditarCosto(id, costo);
-  }
+  if (!btn) return;
+
+  // 1) Extraemos idDetalle, idCompra, idProveedor y costoActual
+  const idDetalle = btn.dataset.idDetalle;
+  const idCompra = btn.dataset.idCompra;
+  const costoActual = btn.dataset.costo;
+ const purchaseTable = btn.closest('table.table-bordered');
+  const filaCompras   = purchaseTable.closest('tr.fila-compras');
+  const filaProv      = filaCompras.previousElementSibling;
+  const idProveedor   = filaProv.dataset.proveedorId;
+
+  // 2) Volcamos en los hidden + en el campo de costo
+  idDetalleEditar.value = idDetalle;
+  idCompraEditar.value = idCompra;
+  idProveedorEditar.value = idProveedor;
+  nuevoCostoInput.value = costoActual;
+
+  // 3) Abrimos modal
+  modalEditarCosto.show();
 });
+
+
 
 
 
@@ -323,11 +359,14 @@ function renderTablaCompras(data, contenedor) {
               <td>${detalle.cantidad}</td>
               <td>${detalle.costo}</td>
               <td>
-                <button class="btn btn-sm btn-warning btnEditarCosto" 
-                  data-id-detalle="${detalle.id_detalle}" 
-                  data-costo="${detalle.costo}">
-                  Editar Costo
-                </button>
+                <button class="btn btn-sm btn-warning btnEditarCosto"
+         data-id-compra="${compra.id_compra}"
+      data-id-detalle="${detalle.id_detalle}"
+      data-cantidad="${detalle.cantidad}"
+      data-costo="${detalle.costo}">
+   Editar Costo
+ </button>
+
               </td>
 
               
@@ -373,7 +412,8 @@ function renderTablaCompras(data, contenedor) {
                 <tbody>
                 
                   ${detalles.map(det => `
-                    <tr data-id-detalle-expandido="${det.id_detalle}">
+                    <tr data-id-detalle="${det.id_detalle}" 
+                    data-id-detalle-expandido="${det.id_detalle}">
                       <td>${det.tipo}</td>
                       <td>${det.marca}</td>
                       <td>${det.modelo}</td>
@@ -393,16 +433,17 @@ function renderTablaCompras(data, contenedor) {
                       Registrar IMEIs
                     </button>
 
-                    <button class="btn btn-sm btn-warning mt-1 btnEditarCosto"
-                            data-id-detalle="${det.id_detalle}" 
-                            data-costo="${det.costo}">
-                      Editar Costo
-                    </button>
+ <button class="btn btn-sm btn-warning btnEditarCosto"
+         data-id-compra="${compra.id_compra}"
+      data-id-detalle="${det.id_detalle}"
+      data-cantidad="${det.cantidad}"
+      data-costo="${det.costo}">
+   Editar Costo
+ </button>
                   </td>
 
                     </tr>
-                  `).join('')
-            }
+                      `).join('')}
                 </tbody>
               `;
 
@@ -646,24 +687,49 @@ function actualizarContadorImeis(idDetalle) {
     });
 }
 
-async function actualizarCostoTotalYSaldo(idCompra) {
-  try {
-    const res = await fetch(`/api/compras/${idCompra}`);
-    const compra = await res.json();
+function actualizarCostoTotalYSaldo(idCompra) {
+  // 1) Localiza la fila de la compra
+  const filaCompra = document.querySelector(`tr[data-id-compra="${idCompra}"]`);
+  if (!filaCompra) return;
+  // 2) Toma la siguiente fila (la de detalles)
+  const filaDetalles = filaCompra.nextElementSibling;
+  if (!filaDetalles) return;
+  const tabla = filaDetalles.querySelector('table');
+  if (!tabla) return;
 
-    const filaCompra = document.querySelector(`[data-id-compra="${idCompra}"]`);
-    if (filaCompra) {
-      // Actualizar costo total
-      filaCompra.querySelector("td.costoTotal").textContent = parseFloat(compra.costo_total).toFixed(2);
+  // 3) Recorre sólo las filas con al menos 7 <td>
+  let total = 0;
+  tabla.querySelectorAll('tbody tr').forEach(r => {
+    const cols = r.querySelectorAll('td');
+    if (cols.length < 7) return;         // <-- SALTA filas “Error …” u otras
+    const cantidad = parseFloat(cols[5].textContent.trim()) || 0;
+    const costo = parseFloat(cols[6].textContent.trim()) || 0;
+    total += cantidad * costo;
+  });
 
-      // Actualizar saldo pendiente si existe
-      const celdaSaldo = filaCompra.querySelector("td.saldoPendiente");
-      if (celdaSaldo) {
-        celdaSaldo.textContent = parseFloat(compra.saldo_pendiente).toFixed(2);
-      }
-    }
-  } catch (error) {
-    console.error("❌ Error actualizando costo total y saldo pendiente:", error);
-  }
+  // 4) Pinta los resultados
+  filaCompra.querySelector('td.costoTotal').textContent = total.toFixed(2);
+  filaCompra.querySelector('td.saldoPendiente').textContent = total.toFixed(2);
 }
 
+/**
+ * Recalcula el saldo pendiente total del proveedor y lo pinta
+ * en su fila principal. NO cierra ni toca el desglose de detalles.
+ */
+function recalcSaldoProveedor(idProveedor) {
+  const filaProv = document.querySelector(`tr[data-proveedor-id="${idProveedor}"]`);
+  if (!filaProv) return;
+  const filaCompras = filaProv.nextElementSibling;           // la fila oculta de compras
+  if (!filaCompras) return;
+  const tabla = filaCompras.querySelector('table.table-bordered');
+  if (!tabla) return;
+
+  let totalPendiente = 0;
+  tabla.querySelectorAll('tbody tr[data-id-compra]').forEach(tr => {
+    const txt = tr.querySelector('td.saldoPendiente')?.textContent;
+    if (txt) totalPendiente += parseFloat(txt);
+  });
+
+  // Pinta en la segunda celda de la fila del proveedor
+  filaProv.querySelector('td:nth-child(2)').textContent = totalPendiente.toFixed(2);
+}

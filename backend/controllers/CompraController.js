@@ -1,29 +1,69 @@
 import { pool } from '../config/db.js';
 
 // Obtener todas las compras
+// Obtener todas las compras con totales recalculados
 export const getCompras = async (req, res) => {
-    try {
-        const [compras] = await pool.query("SELECT * FROM compras ORDER BY fecha DESC");
-        res.json(compras);
-    } catch (error) {
-        console.error("❌ Error al obtener compras:", error);
-        res.status(500).json({ message: "Error al obtener compras." });
-    }
+  try {
+    const [rows] = await pool.query(`
+      SELECT
+        c.id_compra,
+        c.fecha,
+        IFNULL(SUM(d.cantidad * d.costo), 0)       AS costo_total,
+        IFNULL(SUM(d.cantidad * d.costo), 0)       AS saldo_pendiente
+      FROM compras c
+      LEFT JOIN detalles_compra d ON d.id_compra = c.id_compra
+      GROUP BY c.id_compra, c.fecha
+      ORDER BY c.fecha DESC
+    `);
+    res.json(rows);
+  } catch (err) {
+    console.error("❌ Error al obtener compras recalculadas:", err);
+    res.status(500).json({ message: "Error al obtener compras recalculadas." });
+  }
 };
+
 
 // Obtener compra por ID
 export const getCompraById = async (req, res) => {
-    const { id } = req.params;
-    try {
-        const [compra] = await pool.query("SELECT * FROM compras WHERE id_compra = ?", [id]);
-        if (compra.length === 0) {
-            return res.status(404).json({ message: "Compra no encontrada." });
-        }
-        res.json(compra[0]);
-    } catch (error) {
-        console.error("❌ Error al obtener compra:", error);
-        res.status(500).json({ message: "Error al obtener compra." });
+  const { id } = req.params;
+
+  try {
+    // 1) Verificamos que exista la compra
+    const [rowsCompra] = await pool.query(
+      "SELECT id_compra FROM compras WHERE id_compra = ?",
+      [id]
+    );
+    if (rowsCompra.length === 0) {
+      return res.status(404).json({ message: "Compra no encontrada." });
     }
+
+    // 2) Sumamos todos los costos de sus detalles
+    const [detalles] = await pool.query(
+  "SELECT cantidad, costo FROM detalles_compra WHERE id_compra = ?",
+  [idCompra]
+);
+const costoTotal = detalles.reduce((sum, d) => 
+  sum + (parseFloat(d.costo) * Number(d.cantidad)), 
+  0
+);
+
+    // 3) Por ahora, el saldo pendiente es igual al costo total
+    const saldoPendiente = costoTotal;
+
+    // 4) Devolvemos el JSON con los valores recalculados
+    return res.json({
+      id_compra: id,
+      costo_total: costoTotal,
+      saldo_pendiente: saldoPendiente
+    });
+
+  } catch (err) {
+    console.error('❌ Error en getCompraById:', err);
+    return res.status(500).json({
+      message: 'Error obteniendo la compra',
+      error: err.message
+    });
+  }
 };
 
 // ✅ Crear una compra con detalles
@@ -130,7 +170,7 @@ export const getCompraDetalles = async (req, res) => {
             cap.capacidad,
             c.nombre_color AS color,
             dc.cantidad,
-            dc.costo_unitario AS costo
+            dc.costo AS costo
           FROM detalles_compra dc
           JOIN inventario i ON dc.id_tipo = i.id_tipo 
             AND dc.id_marca = i.id_marca 
@@ -310,34 +350,29 @@ export const getIdInventarioPorDetalles = async (req, res) => {
   };
   
   export const getComprasPorProveedor = async (req, res) => {
-    const { id } = req.params;
-  
-    try {
-      const [rows] = await pool.query(
-        `
-        SELECT c.id_compra, c.fecha, c.costo_total,
-          IFNULL((
-            SELECT SUM(a.monto_abono)
-            FROM abonos_proveedores a
-            WHERE a.id_compra = c.id_compra
-          ), 0) AS total_abonado,
-          (c.costo_total - IFNULL((
-            SELECT SUM(a.monto_abono)
-            FROM abonos_proveedores a
-            WHERE a.id_compra = c.id_compra
-          ), 0)) AS saldo_pendiente
-        FROM compras c
-        WHERE c.proveedor_id = ?
-        `,
-        [id]
-      );
-  
-      res.json(rows);
-    } catch (error) {
-      console.error("❌ Error al obtener compras del proveedor:", error.sqlMessage || error.message);
-      res.status(500).json({ message: 'Error al obtener compras del proveedor' });
-    }
-  };
+  const { id } = req.params;
+  try {
+    const [rows] = await pool.query(`
+      SELECT
+        c.id_compra,
+        c.fecha,
+        IFNULL(SUM(d.cantidad * d.costo), 0)       AS costo_total,
+        IFNULL(SUM(d.cantidad * d.costo), 0)       AS saldo_pendiente
+      FROM compras c
+      LEFT JOIN detalles_compra d ON d.id_compra = c.id_compra
+      WHERE c.proveedor_id = ?
+      GROUP BY c.id_compra, c.fecha
+      ORDER BY c.fecha DESC
+    `, [id]);
+    return res.json(rows);
+  } catch (err) {
+    console.error("❌ Error en getComprasPorProveedor recalculadas:", err);
+    return res.status(500).json({ message: "Error al obtener compras del proveedor." });
+  }
+};
+
+
+
   
 
   export const obtenerDetallesPorCompra = async (req, res) => {

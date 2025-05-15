@@ -1,4 +1,7 @@
-import DetallesCompraModel from '../models/detallesCompraModel.js'; // ✅ Importación corregida
+import DetallesCompraModel from '../models/detallesCompraModel.js';
+import { pool } from '../config/db.js';
+
+
 // 📌 Obtener todos los detalles de compra
 export const getDetallesCompra = (req, res) => {
   DetallesCompraModel.getAllDetalles((err, detalles) => {
@@ -78,21 +81,55 @@ export const deleteDetalleCompra = (req, res) => {
   });
 };
 
-
-export const actualizarCosto = (req, res) => {
-   console.log(`🔥 PUT /api/detalles-compra/${req.params.id}/costo ->`, req.body);
-  const { id } = req.params;
+export const actualizarCosto = async (req, res) => {
+  const idDetalle = req.params.id;
   const { costo } = req.body;
 
-  DetallesCompraModel.updateCostoSolo(id, costo, (err) => {
-    if (err) {
-      return res
-      .status(500)
-      .json({ message: "Error al actualizar el costo", error: err.message });
+  try {
+    // 1) Actualizar el costo del detalle
+    await pool.query(
+      "UPDATE detalles_compra SET costo = ? WHERE id_detalle = ?",
+      [costo, idDetalle]
+    );
+
+    // 2) Obtener el ID de la compra a la que pertenece ese detalle
+    const [rows] = await pool.query(
+      "SELECT id_compra FROM detalles_compra WHERE id_detalle = ?",
+      [idDetalle]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ message: "Detalle no encontrado." });
     }
-    return res
-     .status(200)
-     .json({ message: "Costo actualizado correctamente" });
-  });
+    const idCompra = rows[0].id_compra;
+
+    // 3) Recalcular el costo total sumando todos los detalles
+    const [detalles] = await pool.query(
+      "SELECT costo FROM detalles_compra WHERE id_compra = ?",
+      [idCompra]
+    );
+    const costoTotal = detalles.reduce((sum, d) => sum + parseFloat(d.costo), 0);
+
+    // 4) Actualizar la tabla compras
+    await pool.query(
+      'UPDATE compras SET costo_total = ? WHERE id_compra = ?',
+      [costoTotal, idCompra]
+    );
+
+    // 5) Responder al cliente
+    return res.status(200).json({
+      message: "Costo actualizado correctamente",
+      costo_total: costoTotal,
+      saldo_pendiente: costoTotal
+    });
+
+  } catch (err) {
+    console.error("❌ Error al actualizar costo y totales:", err);
+    return res.status(500).json({
+      message: "Error al actualizar el costo",
+      error: err.message
+    });
+  }
 };
+
+
 
